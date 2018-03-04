@@ -220,11 +220,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return insts[0] or None
 
     def get_cash(self):
-        '''Returns the cash'''
+        '''Returns the available cash'''
         return self._cash
 
     def get_value(self):
-        '''Returns the '''
+        '''Returns the account balance'''
         return self._value
 
     def broker_threads(self):
@@ -266,7 +266,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t = threading.Thread(target=self._t_streaming_prices, kwargs=kwargs)
         t.daemon = True
         t.start()
-        return
+        return q
 
     def order_create(self, order, stopside=None, takeside=None, **kwargs):
         '''okwargs = dict()

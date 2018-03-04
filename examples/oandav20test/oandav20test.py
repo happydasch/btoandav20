@@ -24,10 +24,10 @@ from __future__ import (absolute_import, division, print_function,
 import argparse
 import datetime
 
-# The above could be sent to an independent module
 import backtrader as bt
-import btoandav20 as btoandav20
 from backtrader.utils import flushfile  # win32 quick stdout flushing
+
+import btoandav20
 
 StoreCls = btoandav20.stores.OandaV20Store
 DataCls = btoandav20.feeds.OandaV20Data
