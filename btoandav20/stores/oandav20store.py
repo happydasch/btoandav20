@@ -44,8 +44,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         value/cash refresh
     '''
 
+    params = (
+        ('token', ''),
+        ('account', ''),
+        ('practice', False),
+        ('account_tmout', 10.0),  # account balance refresh timeout
+    )
+
     BrokerCls = None  # broker class will auto register
     DataCls = None  # data class will auto register
+
+    _DTEPOCH = datetime(1970, 1, 1)
 
     # Oanda supported granularities
     _GRANULARITIES = {
@@ -72,18 +81,36 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         (bt.TimeFrame.Months, 1): 'M',
     }
 
+    # Order type matching with oanda
+    _ORDEREXECS = {
+        bt.Order.Market: 'market',
+        bt.Order.Limit: 'limit',
+        bt.Order.Stop: 'stop',
+        bt.Order.StopLimit: 'stop',
+    }
+
+    # oid fields to look for
+    _OIDSINGLE = ['orderOpened',
+                  'tradeOpened',
+                  'tradeReduced']
+    _OIDMULTIPLE = ['tradesClosed']
+
+    _X_ORDER_CREATE = ('STOP_ORDER_CREATE',
+                       'LIMIT_ORDER_CREATE',
+                       'MARKET_IF_TOUCHED_ORDER_CREATE',)
+
+    _X_ORDER_FILLED = ('MARKET_ORDER_CREATE',
+                       'ORDER_FILLED',
+                       'TAKE_PROFIT_FILLED',
+                       'STOP_LOSS_FILLED',
+                       'TRAILING_STOP_FILLED',)
+
     # Oanda api endpoints
     _OAPI_URL = ["api-fxtrade.oanda.com",
                  "api-fxpractice.oanda.com"]
     _OAPI_STREAM_URL = ["stream-fxtrade.oanda.com",
                         "stream-fxpractice.oanda.com"]
 
-    params = (
-        ('token', ''),
-        ('account', ''),
-        ('practice', False),
-        ('account_tmout', 10.0),  # account balance refresh timeout
-    )
 
     @classmethod
     def getdata(cls, *args, **kwargs):
@@ -108,6 +135,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         self.broker = None  # broker instance
         self.datas = list()  # datas that have registered over start
+
+        self._orders = collections.Orderesict()  # map order.ref to oid
+        self._ordersrev = collections.OrderedDict()  # map oid to order.ref
+        self._transpend = collections.defaultdict(collections.deque)
 
         # init oanda v20 api context
         self.oapi = v20.Context(
@@ -147,7 +178,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.broker_threads()
 
     def stop(self):
-        raise Exception("Not implemented")
+        # signal end of thread
+        if self.broker is not None:
+            self.q_ordercreate.put(None)
+            self.q_orderclose.put(None)
+            self.q_account.put(None)
 
     def put_notification(self, msg, *args, **kwargs):
         self.notifs.append((msg, args, kwargs))
@@ -158,55 +193,35 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return [x for x in iter(self.notifs.popleft, None)]
 
     def get_positions(self):
+        # Returns the currently open positions
         try:
             response = self.oapi.position.list_open(self.p.account)
             poslist = response.get('positions', 200)
-
-        except (v20.Exception):
+        except (Exception):
             return None
 
         return poslist
 
     def get_granularity(self, timeframe, compression):
+        # Returns the granularity useable for oanda
         return self._GRANULARITIES.get((timeframe, compression), None)
 
     def get_instrument(self, dataname):
+        # Returns details about the requested instrument
         try:
             response = self.oapi.account.instruments(self.p.account,
                                               instruments=dataname)
             insts = response.get('instruments', 200)
-
-        except Exception as e:
-            print(e)
+        except (Exception):
             return None
 
         return insts[0] or None
-
-    def candles(self, dataname, dtbegin, dtend, timeframe, compression,
-                candleFormat, includeFirst):
-        raise Exception("Not implemented")
 
     def get_cash(self):
         return self._cash
 
     def get_value(self):
         return self._value
-
-    def streaming_events(self, tmout=None):
-        q = queue.Queue()
-        kwargs = {'q': q, 'tmout': tmout}
-
-        t = threading.Thread(target=self._t_streaming_listener, kwargs=kwargs)
-        t.daemon = True
-        t.start()
-
-        t = threading.Thread(target=self._t_streaming_events, kwargs=kwargs)
-        t.daemon = True
-        t.start()
-        return q
-
-    def streaming_prices(self, dataname, tmout=None):
-        raise Exception("Not implemented")
 
     def broker_threads(self):
         self.q_account = queue.Queue()
@@ -228,11 +243,75 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # Wait once for the values to be set
         self._evt_acct.wait(self.p.account_tmout)
 
+    def streaming_events(self, tmout=None):
+        q = queue.Queue()
+        kwargs = {'q': q, 'tmout': tmout}
+
+        t = threading.Thread(target=self._t_streaming_listener, kwargs=kwargs)
+        t.daemon = True
+        t.start()
+
+        t = threading.Thread(target=self._t_streaming_events, kwargs=kwargs)
+        t.daemon = True
+        t.start()
+        return q
+
+    def streaming_prices(self, dataname, tmout=None):
+        q = queue.Queue()
+        kwargs = {'q': q, 'dataname': dataname, 'tmout': tmout}
+        t = threading.Thread(target=self._t_streaming_prices, kwargs=kwargs)
+        t.daemon = True
+        t.start()
+        return
+
     def order_create(self, order, stopside=None, takeside=None, **kwargs):
-        raise Exception("Not implemented")
+        '''okwargs = dict()
+        okwargs['instrument'] = order.data._dataname
+        okwargs['units'] = abs(order.created.size)
+        okwargs['side'] = 'buy' if order.isbuy() else 'sell'
+        okwargs['type'] = self._ORDEREXECS[order.exectype]
+        if order.exectype != bt.Order.Market:
+            okwargs['price'] = order.created.price
+            if order.valid is None:
+                # 1 year and datetime.max fail ... 1 month works
+                valid = datetime.utcnow() + timedelta(days=30)
+            else:
+                valid = order.data.num2date(order.valid)
+                # To timestamp with seconds precision
+            okwargs['expiry'] = int((valid - self._DTEPOCH).total_seconds())
+
+        if order.exectype == bt.Order.StopLimit:
+            okwargs['lowerBound'] = order.created.pricelimit
+            okwargs['upperBound'] = order.created.pricelimit
+
+        if order.exectype == bt.Order.StopTrail:
+            okwargs['trailingStop'] = order.trailamount
+
+        if stopside is not None:
+            okwargs['stopLoss'] = stopside.price
+
+        if takeside is not None:
+            okwargs['takeProfit'] = takeside.price
+
+        okwargs.update(**kwargs)  # anything from the user
+
+        self.q_ordercreate.put((order.ref, okwargs,))
+        return order'''
 
     def order_cancel(self, order):
-        raise Exception("Not implemented")
+        '''self.q_orderclose.put(order.ref)
+        return order'''
+
+    def candles(self, dataname, dtbegin, dtend, timeframe, compression,
+                candleFormat, includeFirst):
+        '''kwargs = locals().copy()
+        kwargs.pop('self')
+        kwargs['q'] = q = queue.Queue()
+        t = threading.Thread(target=self._t_candles, kwargs=kwargs)
+        t.daemon = True
+        t.start()
+        return q'''
+
 
     def _t_streaming_listener(self, q, tmout=None):
         while True:
@@ -252,12 +331,106 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         '''
         # TODO
 
+    def _t_streaming_prices(self, dataname, q, tmout):
+        '''if tmout is not None:
+            _time.sleep(tmout)
+
+        streamer = Streamer(q, environment=self._oenv,
+                            access_token=self.p.token,
+                            headers={'X-Accept-Datetime-Format': 'UNIX'})
+
+        streamer.rates(self.p.account, instruments=dataname)
+        '''
+
     def _transaction(self, trans):
         # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processor
         print(trans)
         # TODO
+        ''' # Invoked from Streaming Events. May actually receive an event for an
+        # oid which has not yet been returned after creating an order. Hence
+        # store if not yet seen, else forward to processer
+        ttype = trans['type']
+        if ttype == 'MARKET_ORDER_CREATE':
+            try:
+                oid = trans['tradeReduced']['id']
+            except KeyError:
+                try:
+                    oid = trans['tradeOpened']['id']
+                except KeyError:
+                    return  # cannot do anything else
+
+        elif ttype in self._X_ORDER_CREATE:
+            oid = trans['id']
+        elif ttype == 'ORDER_FILLED':
+            oid = trans['orderId']
+
+        elif ttype == 'ORDER_CANCEL':
+            oid = trans['orderId']
+
+        elif ttype == 'TRADE_CLOSE':
+            oid = trans['id']
+            pid = trans['tradeId']
+            if pid in self._orders and False:  # Know nothing about trade
+                return  # can do nothing
+
+            # Skip above - at the moment do nothing
+            # Received directly from an event in the WebGUI for example which
+            # closes an existing position related to order with id -> pid
+            # COULD BE DONE: Generate a fake counter order to gracefully
+            # close the existing position
+            msg = ('Received TRADE_CLOSE for unknown order, possibly generated'
+                   ' over a different client or GUI')
+            self.put_notification(msg, trans)
+            return
+
+        else:  # Go aways gracefully
+            try:
+                oid = trans['id']
+            except KeyError:
+                oid = 'None'
+
+            msg = 'Received {} with oid {}. Unknown situation'
+            msg = msg.format(ttype, oid)
+            self.put_notification(msg, trans)
+            return
+
+        try:
+            oref = self._ordersrev[oid]
+            self._process_transaction(oid, trans)
+        except KeyError:  # not yet seen, keep as pending
+            self._transpend[oid].append(trans)'''
+
+    def _process_transaction(self, oid, trans):
+        '''try:
+            oref = self._ordersrev.pop(oid)
+        except KeyError:
+            return
+
+        ttype = trans['type']
+
+        if ttype in self._X_ORDER_FILLED:
+            size = trans['units']
+            if trans['side'] == 'sell':
+                size = -size
+            price = trans['price']
+            self.broker._fill(oref, size, price, ttype=ttype)
+
+        elif ttype in self._X_ORDER_CREATE:
+            self.broker._accept(oref)
+            self._ordersrev[oid] = oref
+
+        elif ttype in 'ORDER_CANCEL':
+            reason = trans['reason']
+            if reason == 'ORDER_FILLED':
+                pass  # individual execs have done the job
+            elif reason == 'TIME_IN_FORCE_EXPIRED':
+                self.broker._expire(oref)
+            elif reason == 'CLIENT_REQUEST':
+                self.broker._cancel(oref)
+            else:  # default action ... if nothing else
+                self.broker._reject(oref)'''
 
     def _t_account(self):
         # Invoked from api thread, fetches account summary and sets current
@@ -349,3 +522,35 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             self.broker._cancel(oref)
         '''
+
+    def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
+                   candleFormat, includeFirst, q):
+
+        '''granularity = self.get_granularity(timeframe, compression)
+        if granularity is None:
+            e = OandaV20TimeFrameError()
+            q.put(e.error_response)
+            return
+
+        dtkwargs = {}
+        if dtbegin is not None:
+            dtkwargs['start'] = int((dtbegin - self._DTEPOCH).total_seconds())
+
+        if dtend is not None:
+            dtkwargs['end'] = int((dtend - self._DTEPOCH).total_seconds())
+
+        try:
+            response = self.oapi.get_history(instrument=dataname,
+                                             granularity=granularity,
+                                             candleFormat=candleFormat,
+                                             **dtkwargs)
+
+        except oandapy.OandaError as e:
+            q.put(e.error_response)
+            q.put(None)
+            return
+
+        for candle in response.get('candles', []):
+            q.put(candle)
+
+        q.put({})  # end of transmission'''
