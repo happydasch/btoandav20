@@ -13,7 +13,6 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
-from v20.account import Account
 
 
 class MetaSingleton(MetaParams):
@@ -159,13 +158,29 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return [x for x in iter(self.notifs.popleft, None)]
 
     def get_positions(self):
-        raise Exception("Not implemented")
+        try:
+            response = self.oapi.position.list_open(self.p.account)
+            poslist = response.get('positions', 200)
+
+        except (v20.Exception):
+            return None
+
+        return poslist
 
     def get_granularity(self, timeframe, compression):
         return self._GRANULARITIES.get((timeframe, compression), None)
 
     def get_instrument(self, dataname):
-        raise Exception("Not implemented")
+        try:
+            response = self.oapi.account.instruments(self.p.account,
+                                              instruments=dataname)
+            insts = response.get('instruments', 200)
+
+        except Exception as e:
+            print(e)
+            return None
+
+        return insts[0] or None
 
     def candles(self, dataname, dtbegin, dtend, timeframe, compression,
                 candleFormat, includeFirst):
@@ -200,7 +215,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t.daemon = True
         t.start()
 
-        '''self.q_ordercreate = queue.Queue()
+        self.q_ordercreate = queue.Queue()
         t = threading.Thread(target=self._t_order_create)
         t.daemon = True
         t.start()
@@ -208,7 +223,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self.q_orderclose = queue.Queue()
         t = threading.Thread(target=self._t_order_cancel)
         t.daemon = True
-        t.start()'''
+        t.start()
 
         # Wait once for the values to be set
         self._evt_acct.wait(self.p.account_tmout)
@@ -257,7 +272,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             try:
                 response = self.oapi.account.summary(self.p.account)
-                accinfo = response.get('account')
+                accinfo = response.get('account', 200)
             except Exception as e:
                 self.put_notification(e)
                 continue
@@ -269,7 +284,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 pass
 
             self._evt_acct.set()
-
 
     def _t_order_create(self):
         '''while True:
@@ -319,7 +333,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         break
                     self._process_transaction(oid, trans)
         '''
-
     def _t_order_cancel(self):
         '''while True:
             oref = self.q_orderclose.get()
