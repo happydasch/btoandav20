@@ -13,6 +13,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from v20.account import Account
 
 
 class MetaSingleton(MetaParams):
@@ -244,7 +245,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # TODO
 
     def _t_account(self):
-        '''while True:
+        # Invoked from api thread, fetches account summary and sets current
+        # values from oanda account
+        while True:
             try:
                 msg = self.q_account.get(timeout=self.p.account_tmout)
                 if msg is None:
@@ -253,19 +256,20 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 pass
 
             try:
-                accinfo = self.oapi.get_account(self.p.account)
+                response = self.oapi.account.summary(self.p.account)
+                accinfo = response.get('account')
             except Exception as e:
                 self.put_notification(e)
                 continue
 
             try:
-                self._cash = accinfo['marginAvail']
-                self._value = accinfo['balance']
+                self._cash = accinfo.marginAvailable
+                self._value = accinfo.balance
             except KeyError:
                 pass
 
             self._evt_acct.set()
-        '''
+
 
     def _t_order_create(self):
         '''while True:

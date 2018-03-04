@@ -38,3 +38,16 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
 
     def __init__(self, **kwargs):
         super(OandaV20Broker, self).__init__()
+        self.o = oandav20store.OandaV20Store(**kwargs)
+
+        self.startingcash = self.cash = 0.0
+        self.startingvalue = self.value = 0.0
+
+    def getcash(self):
+        # This call cannot block if no answer is available from oanda
+        self.cash = cash = self.o.get_cash()
+        return cash
+
+    def getvalue(self, datas=None):
+        self.value = self.o.get_value()
+        return self.value
