@@ -127,8 +127,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         self.notifs = collections.deque()  # store notifications for cerebro
 
-        self._cash = 0.0
-        self._value = 0.0
+        self._cash = 0.0 # margin available, currently available cash
+        self._value = 0.0 # account balance
+        self._currency = None # account currency
+        self._marginRate = 1.0 # margin rate / leverage
 
         self._env = None  # reference to cerebro for general notifications
         self._evt_acct = threading.Event()
@@ -136,7 +138,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self.broker = None  # broker instance
         self.datas = list()  # datas that have registered over start
 
-        self._orders = collections.Orderesict()  # map order.ref to oid
+        self._orders = collections.OrderedDict()  # map order.ref to oid
         self._ordersrev = collections.OrderedDict()  # map oid to order.ref
         self._transpend = collections.defaultdict(collections.deque)
 
@@ -193,7 +195,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return [x for x in iter(self.notifs.popleft, None)]
 
     def get_positions(self):
-        # Returns the currently open positions
+        '''Returns the currently open positions'''
         try:
             response = self.oapi.position.list_open(self.p.account)
             poslist = response.get('positions', 200)
@@ -203,11 +205,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return poslist
 
     def get_granularity(self, timeframe, compression):
-        # Returns the granularity useable for oanda
+        '''Returns the granularity useable for oanda'''
         return self._GRANULARITIES.get((timeframe, compression), None)
 
     def get_instrument(self, dataname):
-        # Returns details about the requested instrument
+        '''Returns details about the requested instrument'''
         try:
             response = self.oapi.account.instruments(self.p.account,
                                               instruments=dataname)
@@ -218,9 +220,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return insts[0] or None
 
     def get_cash(self):
+        '''Returns the cash'''
         return self._cash
 
     def get_value(self):
+        '''Returns the '''
         return self._value
 
     def broker_threads(self):
@@ -453,6 +457,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             try:
                 self._cash = accinfo.marginAvailable
                 self._value = accinfo.balance
+                self._currency = accinfo.currency
+                self._marginRate = accinfo.marginRate
             except KeyError:
                 pass
 
