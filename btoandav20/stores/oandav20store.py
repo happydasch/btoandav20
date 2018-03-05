@@ -13,7 +13,6 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
-from lxml.ElementInclude import include
 
 
 class MetaSingleton(MetaParams):
@@ -249,13 +248,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._evt_acct.wait(self.p.account_tmout)
 
     def streaming_events(self, tmout=None):
+        '''Create threads for event streaming'''
         q = queue.Queue()
         kwargs = {'q': q, 'tmout': tmout}
-
-        t = threading.Thread(target=self._t_streaming_listener, kwargs=kwargs)
-        t.daemon = True
-        t.start()
-
         t = threading.Thread(target=self._t_streaming_events, kwargs=kwargs)
         t.daemon = True
         t.start()
@@ -317,11 +312,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t.start()
         return q
 
-    def _t_streaming_listener(self, q, tmout=None):
-        while True:
-            trans = q.get()
-            self._transaction(trans)
-
     def _t_streaming_events(self, q, tmout=None):
         if tmout is not None:
             _time.sleep(tmout)
@@ -329,14 +319,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         try:
             response = self.oapi_stream.transaction.stream(self.p.account)
             for msg_type, msg in response.parts():
-                if msg_type == "transaction.TransactionHeartbeat":
-                    print("heartbeat")
-                elif msg_type == "transaction.Transaction":
-                    print("transaction")
-                else:
-                    print("unknown", msg_type)
-                print(msg)
-                print()
+                if msg_type == "transaction.Transaction":
+                    self._transaction(msg.dict())
         except Exception as e:
             q.put(e)
 
@@ -351,16 +335,69 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             )
 
             for msg_type, msg in response.parts():
-                if msg_type == "pricing.PricingHeartbeat":
-                    print("heartbeat")
-                elif msg_type == "pricing.Price":
-                    print("pricing")
-                else:
-                    print("unknown", msg_type)
-                print(msg)
-                print()
+                if msg_type == "pricing.Price":
+                    q.put(msg.dict())
         except Exception as e:
             q.put(e)
+
+
+    def _t_account(self):
+        # Invoked from api thread, fetches account summary and sets current
+        # values from oanda account
+        while True:
+            try:
+                msg = self.q_account.get(timeout=self.p.account_tmout)
+                if msg is None:
+                    break  # end of thread
+            except queue.Empty:  # tmout -> time to refresh
+                pass
+
+            try:
+                response = self.oapi.account.summary(self.p.account)
+                accinfo = response.get('account', 200)
+            except Exception as e:
+                self.put_notification(e)
+                continue
+
+            try:
+                self._cash = accinfo.marginAvailable
+                self._value = accinfo.balance
+                self._currency = accinfo.currency
+                self._marginRate = accinfo.marginRate
+            except KeyError:
+                pass
+
+            self._evt_acct.set()
+
+    def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
+                   candleFormat, includeFirst, q):
+
+        granularity = self.get_granularity(timeframe, compression)
+        if granularity is None:
+            q.put(None)
+            return
+
+        dtkwargs = {}
+        if dtbegin is not None:
+            dtkwargs['from'] = int((dtbegin - self._DTEPOCH).total_seconds())
+            dtkwargs['includeFirst'] = int(includeFirst)
+
+        if dtend is not None:
+            dtkwargs['to'] = int((dtend - self._DTEPOCH).total_seconds())
+
+        try:
+            response = self.oapi.instrument.candles(dataname,
+                                             granularity=granularity,
+                                             price=candleFormat,
+                                             **dtkwargs)
+
+        except Exception as e:
+            return
+
+        for candle in response.get('candles'):
+            q.put(candle.dict())
+
+        q.put({})  # end of transmission'''
 
     def _transaction(self, trans):
         # Invoked from Streaming Events. May actually receive an event for an
@@ -452,34 +489,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             else:  # default action ... if nothing else
                 self.broker._reject(oref)'''
 
-    def _t_account(self):
-        # Invoked from api thread, fetches account summary and sets current
-        # values from oanda account
-        while True:
-            try:
-                msg = self.q_account.get(timeout=self.p.account_tmout)
-                if msg is None:
-                    break  # end of thread
-            except queue.Empty:  # tmout -> time to refresh
-                pass
-
-            try:
-                response = self.oapi.account.summary(self.p.account)
-                accinfo = response.get('account', 200)
-            except Exception as e:
-                self.put_notification(e)
-                continue
-
-            try:
-                self._cash = accinfo.marginAvailable
-                self._value = accinfo.balance
-                self._currency = accinfo.currency
-                self._marginRate = accinfo.marginRate
-            except KeyError:
-                pass
-
-            self._evt_acct.set()
-
     def _t_order_create(self):
         '''while True:
             msg = self.q_ordercreate.get()
@@ -529,7 +538,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     self._process_transaction(oid, trans)
         '''
     def _t_order_cancel(self):
-        '''while True:
+        while True:
             oref = self.q_orderclose.get()
             if oref is None:
                 break
@@ -538,39 +547,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             if oid is None:
                 continue  # the order is no longer there
             try:
-                o = self.oapi.close_order(self.p.account, oid)
+                o = self.oapi.trade.close(self.p.account, oid)
             except Exception as e:
                 continue  # not cancelled - FIXME: notify
 
             self.broker._cancel(oref)
-        '''
-
-    def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
-                   candleFormat, includeFirst, q):
-
-        granularity = self.get_granularity(timeframe, compression)
-        if granularity is None:
-            q.put(None)
-            return
-
-        dtkwargs = {}
-        if dtbegin is not None:
-            dtkwargs['from'] = int((dtbegin - self._DTEPOCH).total_seconds())
-            dtkwargs['includeFirst'] = int(includeFirst)
-
-        if dtend is not None:
-            dtkwargs['to'] = int((dtend - self._DTEPOCH).total_seconds())
-
-        try:
-            response = self.oapi.instrument.candles(dataname,
-                                             granularity=granularity,
-                                             price=candleFormat,
-                                             **dtkwargs)
-
-        except Exception as e:
-            return
-
-        for candle in response.get('candles'):
-            q.put(candle.dict())
-
-        q.put({})  # end of transmission'''

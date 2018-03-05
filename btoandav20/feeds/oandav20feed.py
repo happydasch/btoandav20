@@ -333,7 +333,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     # passing None to fetch max possible in 1 request
                     dtbegin = None
 
-                dtend = datetime.utcfromtimestamp(int(msg['time']) / 10 ** 6)
+                dtend = datetime.utcfromtimestamp(int(float(msg['time'])) / 10 ** 6)
 
                 self.qhist = self.o.candles(
                     self.p.dataname, dtbegin, dtend,
@@ -407,7 +407,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         self.lines.openinterest[0] = 0.0
 
         # Put the prices into the bar
-        tick = float(msg['ask']) if self.p.useask else float(msg['bid'])
+        tick = float(msg['asks'][0]['price']) if self.p.useask else float(msg['bids'][0]['price'])
         self.lines.open[0] = tick
         self.lines.high[0] = tick
         self.lines.low[0] = tick
