@@ -13,6 +13,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from lxml.ElementInclude import include
 
 
 class MetaSingleton(MetaParams):
@@ -269,7 +270,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return q
 
     def order_create(self, order, stopside=None, takeside=None, **kwargs):
-        '''okwargs = dict()
+        okwargs = dict()
         okwargs['instrument'] = order.data._dataname
         okwargs['units'] = abs(order.created.size)
         okwargs['side'] = 'buy' if order.isbuy() else 'sell'
@@ -300,22 +301,21 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         okwargs.update(**kwargs)  # anything from the user
 
         self.q_ordercreate.put((order.ref, okwargs,))
-        return order'''
+        return order
 
     def order_cancel(self, order):
-        '''self.q_orderclose.put(order.ref)
-        return order'''
+        self.q_orderclose.put(order.ref)
+        return order
 
     def candles(self, dataname, dtbegin, dtend, timeframe, compression,
                 candleFormat, includeFirst):
-        '''kwargs = locals().copy()
+        kwargs = locals().copy()
         kwargs.pop('self')
         kwargs['q'] = q = queue.Queue()
         t = threading.Thread(target=self._t_candles, kwargs=kwargs)
         t.daemon = True
         t.start()
-        return q'''
-
+        return q
 
     def _t_streaming_listener(self, q, tmout=None):
         while True:
@@ -325,26 +325,42 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def _t_streaming_events(self, q, tmout=None):
         if tmout is not None:
             _time.sleep(tmout)
-        '''
-                streamer = Streamer(q,
-                                    environment=self._oenv,
-                                    access_token=self.p.token,
-                                    headers={'X-Accept-Datetime-Format': 'UNIX'})
 
-                streamer.events(ignore_heartbeat=False)
-        '''
-        # TODO
+        try:
+            response = self.oapi_stream.transaction.stream(self.p.account)
+            for msg_type, msg in response.parts():
+                if msg_type == "transaction.TransactionHeartbeat":
+                    print("heartbeat")
+                elif msg_type == "transaction.Transaction":
+                    print("transaction")
+                else:
+                    print("unknown", msg_type)
+                print(msg)
+                print()
+        except Exception as e:
+            q.put(e.error_response)
 
     def _t_streaming_prices(self, dataname, q, tmout):
-        '''if tmout is not None:
+        if tmout is not None:
             _time.sleep(tmout)
 
-        streamer = Streamer(q, environment=self._oenv,
-                            access_token=self.p.token,
-                            headers={'X-Accept-Datetime-Format': 'UNIX'})
+        try:
+            response = self.oapi_stream.pricing.stream(
+                self.p.account,
+                instruments=dataname,
+            )
 
-        streamer.rates(self.p.account, instruments=dataname)
-        '''
+            for msg_type, msg in response.parts():
+                if msg_type == "pricing.PricingHeartbeat":
+                    print("heartbeat")
+                elif msg_type == "pricing.Price":
+                    print("pricing")
+                else:
+                    print("unknown", msg_type)
+                print(msg)
+                print()
+        except Exception as e:
+            q.put(e.error_response)
 
     def _transaction(self, trans):
         # Invoked from Streaming Events. May actually receive an event for an
@@ -532,23 +548,23 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, q):
 
-        '''granularity = self.get_granularity(timeframe, compression)
+        granularity = self.get_granularity(timeframe, compression)
         if granularity is None:
-            e = OandaV20TimeFrameError()
-            q.put(e.error_response)
+            q.put(None)
             return
 
         dtkwargs = {}
         if dtbegin is not None:
-            dtkwargs['start'] = int((dtbegin - self._DTEPOCH).total_seconds())
+            dtkwargs['from'] = int((dtbegin - self._DTEPOCH).total_seconds())
 
         if dtend is not None:
-            dtkwargs['end'] = int((dtend - self._DTEPOCH).total_seconds())
+            dtkwargs['to'] = int((dtend - self._DTEPOCH).total_seconds())
 
         try:
-            response = self.oapi.get_history(instrument=dataname,
+            response = self.oapi.instrument.candles(instrument=dataname,
                                              granularity=granularity,
-                                             candleFormat=candleFormat,
+                                             price=candleFormat,
+                                             includeFirst=includeFirst,
                                              **dtkwargs)
 
         except oandapy.OandaError as e:
@@ -557,6 +573,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             return
 
         for candle in response.get('candles', []):
+            print(candle)
             q.put(candle)
 
         q.put({})  # end of transmission'''
