@@ -390,7 +390,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                                              granularity=granularity,
                                              price=candleFormat,
                                              **dtkwargs)
-
         except Exception as e:
             return
 

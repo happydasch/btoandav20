@@ -333,7 +333,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     # passing None to fetch max possible in 1 request
                     dtbegin = None
 
-                dtend = datetime.utcfromtimestamp(int(float(msg['time'])) / 10 ** 6)
+                dtend = datetime.utcfromtimestamp(float(msg['time']))
 
                 self.qhist = self.o.candles(
                     self.p.dataname, dtbegin, dtend,
@@ -396,7 +396,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     return False
 
     def _load_tick(self, msg):
-        dtobj = datetime.utcfromtimestamp(int(float(msg['time'])) / 10 ** 6)
+        dtobj = datetime.utcfromtimestamp(float(msg['time']))
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:
             return False  # time already seen
@@ -418,7 +418,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         return True
 
     def _load_history(self, msg):
-        dtobj = datetime.utcfromtimestamp(int(float(msg['time'])) / 10 ** 6)
+        dtobj = datetime.utcfromtimestamp(float(msg['time']))
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:
             return False  # time already seen
