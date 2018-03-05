@@ -396,7 +396,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     return False
 
     def _load_tick(self, msg):
-        dtobj = datetime.utcfromtimestamp(int(msg['time']) / 10 ** 6)
+        dtobj = datetime.utcfromtimestamp(int(float(msg['time'])) / 10 ** 6)
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:
             return False  # time already seen
@@ -418,7 +418,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         return True
 
     def _load_history(self, msg):
-        dtobj = datetime.utcfromtimestamp(int(msg['time']) / 10 ** 6)
+        dtobj = datetime.utcfromtimestamp(int(float(msg['time'])) / 10 ** 6)
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:
             return False  # time already seen
@@ -431,19 +431,19 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         # Put the prices into the bar
         if self.p.bidask:
             if not self.p.useask:
-                self.lines.open[0] = float(msg['openBid'])
-                self.lines.high[0] = float(msg['highBid'])
-                self.lines.low[0] = float(msg['lowBid'])
-                self.lines.close[0] = float(msg['closeBid'])
+                self.lines.open[0] = float(msg['bid']['o'])
+                self.lines.high[0] = float(msg['bid']['h'])
+                self.lines.low[0] = float(msg['bid']['l'])
+                self.lines.close[0] = float(msg['bid']['c'])
             else:
-                self.lines.open[0] = float(msg['openAsk'])
-                self.lines.high[0] = float(msg['highAsk'])
-                self.lines.low[0] = float(msg['lowAsk'])
-                self.lines.close[0] = float(msg['closeAsk'])
+                self.lines.open[0] = float(msg['ask']['o'])
+                self.lines.high[0] = float(msg['ask']['h'])
+                self.lines.low[0] = float(msg['ask']['l'])
+                self.lines.close[0] = float(msg['ask']['c'])
         else:
-            self.lines.open[0] = float(msg['openMid'])
-            self.lines.high[0] = float(msg['highMid'])
-            self.lines.low[0] = float(msg['lowMid'])
-            self.lines.close[0] = float(msg['closeMid'])
+            self.lines.open[0] = float(msg['mid']['o'])
+            self.lines.high[0] = float(msg['mid']['h'])
+            self.lines.low[0] = float(msg['mid']['l'])
+            self.lines.close[0] = float(msg['mid']['c'])
 
         return True

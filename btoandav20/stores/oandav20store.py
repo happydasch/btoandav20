@@ -338,7 +338,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 print(msg)
                 print()
         except Exception as e:
-            q.put(e.error_response)
+            q.put(e)
 
     def _t_streaming_prices(self, dataname, q, tmout):
         if tmout is not None:
@@ -360,7 +360,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 print(msg)
                 print()
         except Exception as e:
-            q.put(e.error_response)
+            q.put(e)
 
     def _transaction(self, trans):
         # Invoked from Streaming Events. May actually receive an event for an
@@ -556,24 +556,21 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         dtkwargs = {}
         if dtbegin is not None:
             dtkwargs['from'] = int((dtbegin - self._DTEPOCH).total_seconds())
+            dtkwargs['includeFirst'] = int(includeFirst)
 
         if dtend is not None:
             dtkwargs['to'] = int((dtend - self._DTEPOCH).total_seconds())
 
         try:
-            response = self.oapi.instrument.candles(instrument=dataname,
+            response = self.oapi.instrument.candles(dataname,
                                              granularity=granularity,
                                              price=candleFormat,
-                                             includeFirst=includeFirst,
                                              **dtkwargs)
 
-        except oandapy.OandaError as e:
-            q.put(e.error_response)
-            q.put(None)
+        except Exception as e:
             return
 
-        for candle in response.get('candles', []):
-            print(candle)
-            q.put(candle)
+        for candle in response.get('candles'):
+            q.put(candle.dict())
 
         q.put({})  # end of transmission'''
