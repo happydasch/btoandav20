@@ -83,10 +83,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     # Order type matching with oanda
     _ORDEREXECS = {
-        bt.Order.Market: 'market',
-        bt.Order.Limit: 'limit',
-        bt.Order.Stop: 'stop',
-        bt.Order.StopLimit: 'stop',
+        bt.Order.Market: 'MARKET',
+        bt.Order.Limit: 'LIMIT',
+        bt.Order.Stop: 'STOP',
+        bt.Order.StopLimit: 'STOP',
     }
 
     # oid fields to look for
@@ -198,11 +198,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         '''Returns the currently open positions'''
         try:
             response = self.oapi.position.list_open(self.p.account)
-            poslist = response.get('positions', 200)
+            pos = response.get('positions', 200)
+            # convert positions to dict
+            for idx, val in enumerate(pos):
+                pos[idx] = val.dict()
         except (Exception):
             return None
 
-        return poslist
+        return pos
 
     def get_granularity(self, timeframe, compression):
         '''Returns the granularity useable for oanda'''
@@ -213,11 +216,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         try:
             response = self.oapi.account.instruments(self.p.account,
                                               instruments=dataname)
-            insts = response.get('instruments', 200)
+            inst = response.get('instruments', 200)
+            # convert instrumens to dict
+            for idx, val in enumerate(inst):
+                inst[idx] = val.dict()
         except (Exception):
             return None
 
-        return insts[0] or None
+        return inst[0] or None
 
     def get_cash(self):
         '''Returns the available cash'''
@@ -267,8 +273,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def order_create(self, order, stopside=None, takeside=None, **kwargs):
         okwargs = dict()
         okwargs['instrument'] = order.data._dataname
-        okwargs['units'] = abs(order.created.size)
-        okwargs['side'] = 'buy' if order.isbuy() else 'sell'
+        okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
         if order.exectype != bt.Order.Market:
             okwargs['price'] = order.created.price
@@ -281,17 +286,16 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             okwargs['expiry'] = int((valid - self._DTEPOCH).total_seconds())
 
         if order.exectype == bt.Order.StopLimit:
-            okwargs['lowerBound'] = order.created.pricelimit
-            okwargs['upperBound'] = order.created.pricelimit
+            okwargs['priceBound'] = order.created.pricelimit
 
         if order.exectype == bt.Order.StopTrail:
-            okwargs['trailingStop'] = order.trailamount
+            okwargs['distance'] = order.trailamount
 
         if stopside is not None:
-            okwargs['stopLoss'] = stopside.price
+            okwargs['stopLossOnFill'] = stopside.price
 
         if takeside is not None:
-            okwargs['takeProfit'] = takeside.price
+            okwargs['takeProfitOnFill'] = takeside.price
 
         okwargs.update(**kwargs)  # anything from the user
 
@@ -491,24 +495,26 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             oref, okwargs = msg
             try:
-                o = self.oapi.order.create(self.p.account, **okwargs)
+                response = self.oapi.order.create(self.p.account, order=okwargs)
+                o = response.get('orderFillTransaction').dict()
             except Exception as e:
                 self.put_notification(e)
-                self.broker._reject(order.ref)
+                self.broker._reject(oref)
                 return
 
             # Ids are delivered in different fields and all must be fetched to
             # match them (as executions) to the order generated here
             _o = {'id': None}
             oids = list()
+            print(o)
             for oidfield in self._OIDSINGLE:
-                if oidfield in o and 'id' in o[oidfield]:
-                    oids.append(o[oidfield]['id'])
+                if oidfield in o and 'tradeID' in o[oidfield]:
+                    oids.append(o[oidfield]['tradeID'])
 
             for oidfield in self._OIDMULTIPLE:
                 if oidfield in o:
                     for suboidfield in o[oidfield]:
-                        oids.append(suboidfield['id'])
+                        oids.append(suboidfield['tradeID'])
 
             if not oids:
                 self.broker._reject(oref)
@@ -541,7 +547,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             if oid is None:
                 continue  # the order is no longer there
             try:
-                o = self.oapi.trade.close(self.p.account, oid)
+                response = self.oapi.trade.close(self.p.account, oid)
             except Exception as e:
                 continue  # not cancelled - FIXME: notify
 
