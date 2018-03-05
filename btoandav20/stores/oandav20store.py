@@ -313,7 +313,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return q
 
     def _t_streaming_events(self, q, tmout=None):
-        '''Thread method for streaming transaction events'''
         if tmout is not None:
             _time.sleep(tmout)
 
@@ -326,7 +325,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             q.put(e)
 
     def _t_streaming_prices(self, dataname, q, tmout):
-        '''Thread method for streaming data'''
         if tmout is not None:
             _time.sleep(tmout)
 
@@ -344,9 +342,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
 
     def _t_account(self):
-        '''Thread method for streaming account data'''
-        # Invoked from api thread, fetches account summary and sets current
-        # values from oanda account
         while True:
             try:
                 msg = self.q_account.get(timeout=self.p.account_tmout)
@@ -374,8 +369,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, q):
-        '''Thread method for processing history data'''
-
         granularity = self.get_granularity(timeframe, compression)
         if granularity is None:
             q.put(None)
