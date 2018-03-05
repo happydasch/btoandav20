@@ -313,6 +313,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return q
 
     def _t_streaming_events(self, q, tmout=None):
+        '''Thread method for streaming transaction events'''
         if tmout is not None:
             _time.sleep(tmout)
 
@@ -325,6 +326,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             q.put(e)
 
     def _t_streaming_prices(self, dataname, q, tmout):
+        '''Thread method for streaming data'''
         if tmout is not None:
             _time.sleep(tmout)
 
@@ -342,6 +344,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
 
     def _t_account(self):
+        '''Thread method for streaming account data'''
         # Invoked from api thread, fetches account summary and sets current
         # values from oanda account
         while True:
@@ -371,6 +374,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, q):
+        '''Thread method for processing history data'''
 
         granularity = self.get_granularity(timeframe, compression)
         if granularity is None:
@@ -402,9 +406,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processor
-        print(trans)
-        # TODO
-        ''' # Invoked from Streaming Events. May actually receive an event for an
+        # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processer
         ttype = trans['type']
@@ -456,10 +458,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             oref = self._ordersrev[oid]
             self._process_transaction(oid, trans)
         except KeyError:  # not yet seen, keep as pending
-            self._transpend[oid].append(trans)'''
+            self._transpend[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
-        '''try:
+        try:
             oref = self._ordersrev.pop(oid)
         except KeyError:
             return
@@ -486,17 +488,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             elif reason == 'CLIENT_REQUEST':
                 self.broker._cancel(oref)
             else:  # default action ... if nothing else
-                self.broker._reject(oref)'''
+                self.broker._reject(oref)
 
     def _t_order_create(self):
-        '''while True:
+        while True:
             msg = self.q_ordercreate.get()
             if msg is None:
                 break
 
             oref, okwargs = msg
             try:
-                o = self.oapi.create_order(self.p.account, **okwargs)
+                o = self.oapi.order.create(self.p.account, **okwargs)
             except Exception as e:
                 self.put_notification(e)
                 self.broker._reject(order.ref)
@@ -535,7 +537,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     if trans is None:
                         break
                     self._process_transaction(oid, trans)
-        '''
+
     def _t_order_cancel(self):
         while True:
             oref = self.q_orderclose.get()
