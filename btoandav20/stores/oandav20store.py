@@ -89,7 +89,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.StopLimit: 'STOP',
     }
 
-    # oid fields to look for
     _OIDSINGLE = ['orderOpened',
                   'tradeOpened',
                   'tradeReduced']
@@ -123,6 +122,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return cls.BrokerCls(*args, **kwargs)
 
     def __init__(self):
+        '''Initialization'''
         super(OandaV20Store, self).__init__()
 
         self.notifs = collections.deque()  # store notifications for cerebro
@@ -187,6 +187,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.q_account.put(None)
 
     def put_notification(self, msg, *args, **kwargs):
+        '''Adds a notification'''
         self.notifs.append((msg, args, kwargs))
 
     def get_notifications(self):
@@ -234,6 +235,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return self._value
 
     def broker_threads(self):
+        '''Creates threads for broker functionality'''
         self.q_account = queue.Queue()
         self.q_account.put(True)  # force an immediate update
         t = threading.Thread(target=self._t_account)
@@ -254,7 +256,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._evt_acct.wait(self.p.account_tmout)
 
     def streaming_events(self, tmout=None):
-        '''Create threads for event streaming'''
+        '''Creates threads for event streaming'''
         q = queue.Queue()
         kwargs = {'q': q, 'tmout': tmout}
         t = threading.Thread(target=self._t_streaming_events, kwargs=kwargs)
@@ -263,6 +265,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return q
 
     def streaming_prices(self, dataname, tmout=None):
+        '''Creates threads for price streaming'''
         q = queue.Queue()
         kwargs = {'q': q, 'dataname': dataname, 'tmout': tmout}
         t = threading.Thread(target=self._t_streaming_prices, kwargs=kwargs)
@@ -271,6 +274,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return q
 
     def order_create(self, order, stopside=None, takeside=None, **kwargs):
+        '''Creates an order'''
         okwargs = dict()
         okwargs['instrument'] = order.data._dataname
         okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
@@ -303,14 +307,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return order
 
     def order_cancel(self, order):
+        '''Cancels a order'''
         self.q_orderclose.put(order.ref)
         return order
 
     def candles(self, dataname, dtbegin, dtend, timeframe, compression,
                 candleFormat, includeFirst):
-        kwargs = locals().copy()
-        kwargs.pop('self')
-        kwargs['q'] = q = queue.Queue()
+        '''Returns historical rates'''
+        q = queue.Queue()
+        kwargs = {'dataname': dataname, 'dtbegin': dtbegin, 'dtend': dtend,
+                   'timeframe': timeframe, 'compression': compression, 'candleFormat': candleFormat,
+                   'includeFirst': includeFirst, 'q': q}
         t = threading.Thread(target=self._t_candles, kwargs=kwargs)
         t.daemon = True
         t.start()
@@ -321,7 +328,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             _time.sleep(tmout)
 
         try:
-            response = self.oapi_stream.transaction.stream(self.p.account)
+            response = self.oapi_stream.transaction.stream(
+                self.p.account
+            )
             for msg_type, msg in response.parts():
                 if msg_type == "transaction.Transaction":
                     self._transaction(msg.dict())
@@ -337,13 +346,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.p.account,
                 instruments=dataname,
             )
-
             for msg_type, msg in response.parts():
                 if msg_type == "pricing.Price":
                     q.put(msg.dict())
         except Exception as e:
             q.put(e)
-
 
     def _t_account(self):
         while True:
@@ -400,12 +407,15 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         q.put({})  # end of transmission'''
 
     def _transaction(self, trans):
+        # TODO
         # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processor
         # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processer
+        print("Transaction", trans)
+        return
         ttype = trans['type']
         if ttype == 'MARKET_ORDER_CREATE':
             try:
@@ -458,6 +468,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._transpend[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
+        print(oid, trans)
+        return
+        # TODO
         try:
             oref = self._ordersrev.pop(oid)
         except KeyError:
@@ -494,9 +507,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 break
 
             oref, okwargs = msg
+            print(msg)
             try:
                 response = self.oapi.order.create(self.p.account, order=okwargs)
-                o = response.get('orderFillTransaction').dict()
+                print(response.body)
+                return
             except Exception as e:
                 self.put_notification(e)
                 self.broker._reject(oref)
