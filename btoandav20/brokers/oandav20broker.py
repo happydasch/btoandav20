@@ -100,7 +100,7 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         if self.p.use_positions:
             for p in self.o.get_positions():
                 print('position for instrument:', p['instrument'])
-                size = float(p['long']['units']) - float(p['short']['units'])
+                size = float(p['long']['units']) + float(p['short']['units'])
                 price = float(p['long']['averagePrice']) if size > 0 else float(p['short']['averagePrice'])
                 self.positions[p['instrument']] = Position(size, price)
 

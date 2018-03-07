@@ -54,6 +54,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     BrokerCls = None  # broker class will auto register
     DataCls = None  # data class will auto register
 
+
     _DTEPOCH = datetime(1970, 1, 1)
 
     # Oanda supported granularities
@@ -133,6 +134,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._env = None  # reference to cerebro for general notifications
         self._evt_acct = threading.Event()
         self._orders = collections.OrderedDict()  # map order.ref to oid
+        self._ordersrev = collections.OrderedDict()  # map oid to order.ref
 
         # init oanda v20 api context
         self.oapi = v20.Context(
@@ -267,7 +269,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def order_create(self, order, stopside=None, takeside=None, **kwargs):
         '''Creates an order'''
-        print("Order", order)
         okwargs = dict()
         okwargs['instrument'] = order.data._dataname
         okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
@@ -403,10 +404,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processor
-        # Invoked from Streaming Events. May actually receive an event for an
-        # oid which has not yet been returned after creating an order. Hence
-        # store if not yet seen, else forward to processer
-        print("Transaction", trans)
+        print("Transaction", trans['type'])
         return
         ttype = trans['type']
         if ttype == 'MARKET_ORDER_CREATE':
@@ -461,13 +459,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             #FIXME self._transpend[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
-        print("Process transaction", oid, trans)
-        return
-        # TODO
         try:
-            oref = self._ordersrev.pop(oid)
+            oref = self._orders[oid]
         except KeyError:
             return
+
 
         ttype = trans['type']
 
@@ -500,28 +496,32 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 break
 
             oref, okwargs = msg
+            trans = list()
             try:
                 response = self.oapi.order.create(self.p.account, order=okwargs)
-                o = response.body('orderCreateTransaction', 201)
+                o = response.get("orderCreateTransaction", 201)
+                self.broker._submit(oref)
+                trans.append(o.dict())
             except Exception as e:
                 self.put_notification(e)
                 self.broker._reject(oref)
-                return
+                break
 
-            # order was submitted
-            self.broker._submit(oref)
+            # use order id
+            oid = o.id
+            if o.type == self._ORDEREXECS[bt.Order.Market]:
+                # use trade id
+                f = response.get("orderFillTransaction")
+                oid = f.tradeID
+                trans.append(f.dict())
 
-            if (okwargs['type'] == self._ORDEREXECS[bt.Order.Market]):
-                self.broker._accept(oref)
+            # map ids of orders
+            self._orders[oid] = oref
+            self._ordersrev[oref] = oid
 
-
-
-
-
-            print("Order response", response.get("orderCreateTransaction"), response.get("orderFillTransaction"))
-            self._orders[oref] = o.tradeId
-            self._ordersrev[o.tradeId] = oref  # maps ids to backtrader order
-
+            # process transactions after id mapping was added
+            for t in trans:
+                self._process_transaction(oid, t)
 
     def _t_order_cancel(self):
         while True:
