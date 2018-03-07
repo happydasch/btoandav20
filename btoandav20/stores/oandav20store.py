@@ -404,7 +404,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # Invoked from Streaming Events. May actually receive an event for an
         # oid which has not yet been returned after creating an order. Hence
         # store if not yet seen, else forward to processor
-        print("Transaction", trans['type'])
+        #print("Transaction", trans['type'])
         return
         ttype = trans['type']
         if ttype == 'MARKET_ORDER_CREATE':
@@ -460,10 +460,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _process_transaction(self, oid, trans):
         try:
+            # get a reference to a backtrader order based on the order id / trade id
             oref = self._orders[oid]
         except KeyError:
             return
-
 
         ttype = trans['type']
 
@@ -507,17 +507,31 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.broker._reject(oref)
                 break
 
-            # use order id
             oid = o.id
-            if o.type == self._ORDEREXECS[bt.Order.Market]:
-                # use trade id
-                f = response.get("orderFillTransaction")
-                oid = f.tradeID
-                trans.append(f.dict())
-
-            # map ids of orders
             self._orders[oid] = oref
             self._ordersrev[oref] = oid
+
+            # check for other transactions in response
+            try:
+                t = response.get("orderFillTransaction")
+                trans.append(t.dict())
+            except:
+                pass
+            try:
+                t = response.get("orderCancelTransaction")
+                trans.append(t.dict())
+            except:
+                pass
+            try:
+                t = response.get("orderReissueTransaction")
+                trans.append(t.dict())
+            except:
+                pass
+            try:
+                t = response.get("orderReissueRejectTransaction")
+                trans.append(t.dict())
+            except:
+                pass
 
             # process transactions after id mapping was added
             for t in trans:
