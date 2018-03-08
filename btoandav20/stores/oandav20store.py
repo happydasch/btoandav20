@@ -90,16 +90,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.StopLimit: 'STOP',
     }
 
-    _X_ORDER_CREATE = ('STOP_ORDER_CREATE',
-                       'LIMIT_ORDER_CREATE',
-                       'MARKET_IF_TOUCHED_ORDER_CREATE',)
-
-    _X_ORDER_FILLED = ('MARKET_ORDER_CREATE',
-                       'ORDER_FILLED',
-                       'TAKE_PROFIT_FILLED',
-                       'STOP_LOSS_FILLED',
-                       'TRAILING_STOP_FILLED',)
-
     # Oanda api endpoints
     _OAPI_URL = ["api-fxtrade.oanda.com",
                  "api-fxpractice.oanda.com"]
@@ -133,8 +123,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         self._env = None  # reference to cerebro for general notifications
         self._evt_acct = threading.Event()
-        self._orders = collections.OrderedDict()  # map order.ref to oid
-        self._ordersrev = collections.OrderedDict()  # map oid to order.ref
+        self._orders = collections.OrderedDict()  # map order.ref to order id
+        self._trades = collections.OrderedDict()  # map order.ref to trade ids
+        self._transactions = collections.defaultdict(collections.deque) # store pending transactions
 
         # init oanda v20 api context
         self.oapi = v20.Context(
@@ -342,6 +333,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             )
             for msg_type, msg in response.parts():
                 if msg_type == "pricing.Price":
+                    # put price into queue as dict
                     q.put(msg.dict())
         except Exception as e:
             q.put(e)
@@ -401,62 +393,37 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         q.put({})  # end of transmission'''
 
     def _transaction(self, trans):
-        # Invoked from Streaming Events. May actually receive an event for an
-        # oid which has not yet been returned after creating an order. Hence
-        # store if not yet seen, else forward to processor
-        #print("Transaction", trans['type'])
-        return
+        oid = None
         ttype = trans['type']
-        if ttype == 'MARKET_ORDER_CREATE':
-            try:
-                oid = trans['tradeReduced']['id']
-            except KeyError:
-                try:
-                    oid = trans['tradeOpened']['id']
-                except KeyError:
-                    return  # cannot do anything else
-
-        elif ttype in self._X_ORDER_CREATE:
+        if ttype in ['MARKET_ORDER',
+                       'LIMIT_ORDER',
+                       'STOP_ORDER',
+                       'MARKET_IF_TOUCHED_ORDER']:
             oid = trans['id']
-        elif ttype == 'ORDER_FILLED':
+
+        elif ttype in ['ORDER_FILL',]:
             oid = trans['orderId']
 
-        elif ttype == 'ORDER_CANCEL':
+        elif ttype in ['ORDER_CANCEL',]:
             oid = trans['orderId']
 
-        elif ttype == 'TRADE_CLOSE':
-            oid = trans['id']
-            pid = trans['tradeId']
-            if pid in self._orders and False:  # Know nothing about trade
-                return  # can do nothing
-
-            # Skip above - at the moment do nothing
-            # Received directly from an event in the WebGUI for example which
-            # closes an existing position related to order with id -> pid
-            # COULD BE DONE: Generate a fake counter order to gracefully
-            # close the existing position
-            msg = ('Received TRADE_CLOSE for unknown order, possibly generated'
-                   ' over a different client or GUI')
-            self.put_notification(msg, trans)
-            return
-
-        else:  # Go aways gracefully
+        else:  # Go away gracefully
             try:
                 oid = trans['id']
             except KeyError:
-                oid = 'None'
+                pass
 
             msg = 'Received {} with oid {}. Unknown situation'
             msg = msg.format(ttype, oid)
             self.put_notification(msg, trans)
             return
 
-        try:
-            oref = self._ordersrev[oid]
+        if self._orders.has_key(oid):
+            # if the order was created then process the transactions
             self._process_transaction(oid, trans)
-        except KeyError:  # not yet seen, keep as pending
-            pass
-            #FIXME self._transpend[oid].append(trans)
+        else:
+            # if the order is unknown, store transaction for later processing
+            self._transactions[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
         try:
@@ -466,8 +433,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             return
 
         ttype = trans['type']
-
-        if ttype in self._X_ORDER_FILLED:
+        '''if ttype in self._X_ORDER_FILLED:
             size = trans['units']
             if trans['side'] == 'sell':
                 size = -size
@@ -476,7 +442,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         elif ttype in self._X_ORDER_CREATE:
             self.broker._accept(oref)
-            self._ordersrev[oid] = oref
+            #self._ordersrev[oid] = oref
 
         elif ttype in 'ORDER_CANCEL':
             reason = trans['reason']
@@ -487,7 +453,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             elif reason == 'CLIENT_REQUEST':
                 self.broker._cancel(oref)
             else:  # default action ... if nothing else
-                self.broker._reject(oref)
+                self.broker._reject(oref)'''
 
     def _t_order_create(self):
         while True:
@@ -496,46 +462,26 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 break
 
             oref, okwargs = msg
-            trans = list()
             try:
                 response = self.oapi.order.create(self.p.account, order=okwargs)
+                # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
                 self.broker._submit(oref)
-                trans.append(o.dict())
             except Exception as e:
                 self.put_notification(e)
                 self.broker._reject(oref)
                 break
 
+            # use the id of the transaction which created
+            # the order, this will be the order id
             oid = o.id
             self._orders[oid] = oref
-            self._ordersrev[oref] = oid
-
-            # check for other transactions in response
-            try:
-                t = response.get("orderFillTransaction")
-                trans.append(t.dict())
-            except:
-                pass
-            try:
-                t = response.get("orderCancelTransaction")
-                trans.append(t.dict())
-            except:
-                pass
-            try:
-                t = response.get("orderReissueTransaction")
-                trans.append(t.dict())
-            except:
-                pass
-            try:
-                t = response.get("orderReissueRejectTransaction")
-                trans.append(t.dict())
-            except:
-                pass
 
             # process transactions after id mapping was added
-            for t in trans:
-                self._process_transaction(oid, t)
+            if self._transactions.has_key(oid):
+                tpending = self._transactions.pop(oid)
+                for trans in tpending:
+                    self._process_transaction(oid, trans)
 
     def _t_order_cancel(self):
         while True:
