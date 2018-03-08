@@ -392,20 +392,25 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         q.put({})  # end of transmission'''
 
-    def _transaction(self, trans):
-        oid = None
-        ttype = trans['type']
-        if ttype in ['MARKET_ORDER',
+    _X_CREATE_TRANS = ['MARKET_ORDER',
                        'LIMIT_ORDER',
                        'STOP_ORDER',
-                       'MARKET_IF_TOUCHED_ORDER']:
+                       'MARKET_IF_TOUCHED_ORDER']
+    _X_FILL_TRANS   = ['ORDER_FILL',]
+    _X_CANCEL_TRANS  = ['ORDER_CANCEL',]
+
+    def _transaction(self, trans):
+        print(trans)
+        oid = None
+        ttype = trans['type']
+        if ttype in self._X_CREATE_TRANS:
             oid = trans['id']
 
-        elif ttype in ['ORDER_FILL',]:
-            oid = trans['orderId']
+        elif ttype in self._X_FILL_TRANS:
+            oid = trans['orderID']
 
-        elif ttype in ['ORDER_CANCEL',]:
-            oid = trans['orderId']
+        elif ttype in self._X_CANCEL_TRANS:
+            oid = trans['orderID']
 
         else:  # Go away gracefully
             try:
@@ -426,6 +431,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._transactions[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
+
         try:
             # get a reference to a backtrader order based on the order id / trade id
             oref = self._orders[oid]
@@ -433,27 +439,26 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             return
 
         ttype = trans['type']
-        '''if ttype in self._X_ORDER_FILLED:
+        if ttype in self._X_CREATE_TRANS:
+            self.broker._accept(oref)
+
+        elif ttype in self._X_FILL_TRANS:
+            '''f ttype in self._X_ORDER_FILLED:
             size = trans['units']
             if trans['side'] == 'sell':
                 size = -size
             price = trans['price']
-            self.broker._fill(oref, size, price, ttype=ttype)
+            self.broker._fill(oref, size, price, ttype=ttype)'''
+            pass
 
-        elif ttype in self._X_ORDER_CREATE:
-            self.broker._accept(oref)
-            #self._ordersrev[oid] = oref
-
-        elif ttype in 'ORDER_CANCEL':
+        elif ttype in self._X_CANCEL_TRANS:
             reason = trans['reason']
-            if reason == 'ORDER_FILLED':
-                pass  # individual execs have done the job
-            elif reason == 'TIME_IN_FORCE_EXPIRED':
+            if reason == 'TIME_IN_FORCE_EXPIRED':
                 self.broker._expire(oref)
             elif reason == 'CLIENT_REQUEST':
                 self.broker._cancel(oref)
             else:  # default action ... if nothing else
-                self.broker._reject(oref)'''
+                self.broker._reject(oref)
 
     def _t_order_create(self):
         while True:
@@ -469,6 +474,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.broker._submit(oref)
             except Exception as e:
                 self.put_notification(e)
+                print(e)
                 self.broker._reject(oref)
                 break
 
