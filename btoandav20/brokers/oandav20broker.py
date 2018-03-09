@@ -227,7 +227,6 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
 
     def _fill(self, oref, size, price, reason, **kwargs):
         order = self.orders[oref]
-
         if not order.alive():  # can be a bracket
             pref = getattr(order.parent, 'ref', order.ref)
             if pref not in self.brackets:
