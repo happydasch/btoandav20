@@ -398,9 +398,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     _X_CREATE_TRANS = ['MARKET_ORDER',
                        'LIMIT_ORDER',
                        'STOP_ORDER',
-                       'MARKET_IF_TOUCHED_ORDER']
+                       'MARKET_IF_TOUCHED_ORDER',]
     _X_FILL_TRANS   = ['ORDER_FILL',]
-    _X_CANCEL_TRANS  = ['ORDER_CANCEL',]
+    _X_CANCEL_TRANS = ['ORDER_CANCEL',]
 
     def _transaction(self, trans):
         oid = None
@@ -410,6 +410,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         elif ttype in self._X_FILL_TRANS:
             oid = trans['orderID']
+            # check for other affected order
+            if trans.has_key('tradeReduced'):
+                self._process_transaction(trans['tradeReduced']['tradeID'], trans)
+            if trans.has_key('tradesClosed'):
+                for t in trans['tradesClosed']:
+                    self._process_transaction(t['tradeID'], trans)
 
         elif ttype in self._X_CANCEL_TRANS:
             oid = trans['orderID']
@@ -447,6 +453,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             size = float(trans['units'])
             price = float(trans['price'])
             self.broker._fill(oref, size, price, reason=trans['reason'])
+            # store trade ids which were touched by the order
+            if trans.has_key('tradeOpened'):
+                self._orders[trans['tradeOpened']['tradeID']] = oref
+            if trans.has_key('tradeReduced'):
+                self._orders[trans['tradeReduced']['tradeID']] = oref
 
         elif ttype in self._X_CANCEL_TRANS:
             reason = trans['reason']
