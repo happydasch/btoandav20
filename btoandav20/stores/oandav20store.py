@@ -124,7 +124,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._env = None  # reference to cerebro for general notifications
         self._evt_acct = threading.Event()
         self._orders = collections.OrderedDict()  # map order.ref to order id
-        self._trades = collections.OrderedDict()  # map order.ref to trade ids
         self._transactions = collections.defaultdict(collections.deque) # store pending transactions
 
         # init oanda v20 api context
@@ -309,6 +308,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return q
 
     def _t_streaming_events(self, q, tmout=None):
+        '''Callback method for streaming events'''
         if tmout is not None:
             _time.sleep(tmout)
 
@@ -323,6 +323,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             q.put(e)
 
     def _t_streaming_prices(self, dataname, q, tmout):
+        '''Callback method for streaming prices'''
         if tmout is not None:
             _time.sleep(tmout)
 
@@ -339,6 +340,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             q.put(e)
 
     def _t_account(self):
+        '''Callback method for account request'''
         while True:
             try:
                 msg = self.q_account.get(timeout=self.p.account_tmout)
@@ -366,6 +368,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, q):
+        '''Callback method for candles request'''
         granularity = self.get_granularity(timeframe, compression)
         if granularity is None:
             q.put(None)
@@ -400,7 +403,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     _X_CANCEL_TRANS  = ['ORDER_CANCEL',]
 
     def _transaction(self, trans):
-        print(trans)
         oid = None
         ttype = trans['type']
         if ttype in self._X_CREATE_TRANS:
@@ -431,7 +433,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._transactions[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
-
         try:
             # get a reference to a backtrader order based on the order id / trade id
             oref = self._orders[oid]
@@ -443,13 +444,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.broker._accept(oref)
 
         elif ttype in self._X_FILL_TRANS:
-            '''f ttype in self._X_ORDER_FILLED:
-            size = trans['units']
-            if trans['side'] == 'sell':
-                size = -size
-            price = trans['price']
-            self.broker._fill(oref, size, price, ttype=ttype)'''
-            pass
+            size = float(trans['units'])
+            price = float(trans['price'])
+            self.broker._fill(oref, size, price, reason=trans['reason'])
 
         elif ttype in self._X_CANCEL_TRANS:
             reason = trans['reason']
@@ -457,7 +454,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.broker._expire(oref)
             elif reason == 'CLIENT_REQUEST':
                 self.broker._cancel(oref)
-            else:  # default action ... if nothing else
+            else:  # default action
                 self.broker._reject(oref)
 
     def _t_order_create(self):
@@ -474,7 +471,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.broker._submit(oref)
             except Exception as e:
                 self.put_notification(e)
-                print(e)
                 self.broker._reject(oref)
                 break
 
@@ -499,6 +495,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             if oid is None:
                 continue  # the order is no longer there
             try:
+                # TODO either close pending orders or filled trades
                 response = self.oapi.trade.close(self.p.account, oid)
             except Exception as e:
                 continue  # not cancelled - FIXME: notify

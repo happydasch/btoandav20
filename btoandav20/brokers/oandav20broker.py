@@ -225,7 +225,7 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
                 if o.alive():
                     self._cancel(o.ref)
 
-    def _fill(self, oref, size, price, ttype, **kwargs):
+    def _fill(self, oref, size, price, reason, **kwargs):
         order = self.orders[oref]
 
         if not order.alive():  # can be a bracket
@@ -239,9 +239,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
                 return
 
             # [main, stopside, takeside], neg idx to array are -3, -2, -1
-            if ttype == 'STOP_LOSS_FILLED':
+            if reason == 'STOP_LOSS_ORDER':
                 order = self.brackets[pref][-2]
-            elif ttype == 'TAKE_PROFIT_FILLED':
+            elif reason == 'TAKE_PROFIT_ORDER':
                 order = self.brackets[pref][-1]
             else:
                 msg = ('Order fill received for {}, with price {} and size {} '
