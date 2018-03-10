@@ -187,6 +187,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         self._storedmsg = dict()  # keep pending live message (under None)
         self.qlive = queue.Queue()
         self._state = self._ST_OVER
+        self.contractdetails = None
 
         # Kickstart store and get queue to wait on
         self.o.start(data=self)
