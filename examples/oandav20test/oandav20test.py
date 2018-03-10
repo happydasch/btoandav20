@@ -33,6 +33,12 @@ StoreCls = btoandav20.stores.OandaV20Store
 DataCls = btoandav20.feeds.OandaV20Data
 # BrokerCls = btoandav20.brokers.OandaV20Broker
 
+# available timeframes for oanda
+TIMEFRAMES = [bt.TimeFrame.Names[bt.TimeFrame.Seconds],
+         bt.TimeFrame.Names[bt.TimeFrame.Minutes],
+         bt.TimeFrame.Names[bt.TimeFrame.Days],
+         bt.TimeFrame.Names[bt.TimeFrame.Weeks],
+         bt.TimeFrame.Names[bt.TimeFrame.Months]]
 
 class TestStrategy(bt.Strategy):
     params = dict(
@@ -408,8 +414,8 @@ def parse_args(pargs=None):
                         required=False, action='store_true',
                         help='resample to chosen timeframe')
 
-    parser.add_argument('--timeframe', default=bt.TimeFrame.Names[1],
-                        choices=bt.TimeFrame.Names,
+    parser.add_argument('--timeframe', default=TIMEFRAMES[0],
+                        choices=TIMEFRAMES,
                         required=False, action='store',
                         help='TimeFrame for Resample/Replay')
 
@@ -418,7 +424,7 @@ def parse_args(pargs=None):
                         help='Compression for Resample/Replay')
 
     parser.add_argument('--timeframe1', default=None,
-                        choices=bt.TimeFrame.Names,
+                        choices=TIMEFRAMES,
                         required=False, action='store',
                         help='TimeFrame for Resample/Replay - Data1')
 
