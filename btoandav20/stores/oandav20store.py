@@ -210,6 +210,48 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         return inst[0] or None
 
+    def get_instruments(self, dataname):
+        '''Returns details about available instruments'''
+        try:
+            response = self.oapi.account.instruments(self.p.account,
+                                             instruments=dataname)
+            inst = response.get('instruments', 200)
+            # convert instrumens to dict
+            for idx, val in enumerate(inst):
+                inst[idx] = val.dict()
+        except (Exception):
+            return None
+
+        return inst or None
+
+    def get_pricing(self, dataname):
+        '''Returns details about current price'''
+        try:
+            response = self.oapi.pricing.get(self.p.account,
+                                             instruments=dataname)
+            prices = response.get('prices', 200)
+            # convert prices to dict
+            for idx, val in enumerate(prices):
+                prices[idx] = val.dict()
+        except (Exception):
+            return None
+
+        return prices[0] or None
+
+    def get_pricings(self, dataname):
+        '''Returns details about current prices'''
+        try:
+            response = self.oapi.pricing.get(self.p.account,
+                                             instruments=dataname)
+            prices = response.get('prices', 200)
+            # convert prices to dict
+            for idx, val in enumerate(prices):
+                prices[idx] = val.dict()
+        except (Exception):
+            return None
+
+        return prices or None
+
     def get_cash(self):
         '''Returns the available cash'''
         return self._cash
@@ -217,6 +259,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def get_value(self):
         '''Returns the account balance'''
         return self._value
+
+    def get_currency(self):
+        '''Returns the currency of the account'''
+        return self._currency
+
+    def get_margin_rate(self):
+        '''Return the margin rate of the account'''
+        return self._marginRate
 
     def broker_threads(self):
         '''Creates threads for broker functionality'''
@@ -271,7 +321,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             else:
                 valid = order.data.num2date(order.valid)
                 # To timestamp with seconds precision
-            okwargs['expiry'] = int((valid - self._DTEPOCH).total_seconds())
+                #okwargs['valid'] = int((valid - self._DTEPOCH).total_seconds())
 
         if order.exectype == bt.Order.StopLimit:
             okwargs['priceBound'] = order.created.pricelimit

@@ -2,8 +2,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-
-from . import feeds as feeds
-from . import stores as stores
-from . import brokers as brokers
-from . import sizers as sizers
+try:
+    from .oandav20sizer import *
+except ImportError as e:
+    pass  # The user may not have something installed
