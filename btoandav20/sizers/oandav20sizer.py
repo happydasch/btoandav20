@@ -5,8 +5,6 @@ from __future__ import (absolute_import, division, print_function,
 import backtrader as bt
 from btoandav20.stores import oandav20store
 
-__all__ = ['OandaV20Sizer', 'OandaV20Percent', 'OandaV20Cash',]
-
 class OandaV20Sizer(bt.Sizer):
 
     params = (
