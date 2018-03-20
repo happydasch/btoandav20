@@ -53,7 +53,6 @@ class OandaV20Risk(OandaV20Sizer):
     )
 
     def _getsizing(self, comminfo, cash, data, isbuy):
-        avail = 0
         name = data.contractdetails['name']
 
         sym_from = name[:3]
@@ -74,16 +73,16 @@ class OandaV20Risk(OandaV20Sizer):
 
         # risk per pip
         price_per_pip = cash_to_use / self.p.stoploss
-        instr = self.o.get_instrument(name)
         price = self.o.get_pricing(name)
 
         size = 0
-        if instr is not None and price is not None:
-            size = price_per_pip * (1 / 10 ** instr['pipLocation'])
+        if price is not None:
+            size = price_per_pip * (1 / 10 ** data.contractdetails['pipLocation'])
             if isbuy:
                 size = min(size, float(price['unitsAvailable']['default']['long']))
             else:
                 size = min(size, float(price['unitsAvailable']['default']['short']))
+
         return size
 
 class OandaV20RiskPercent(OandaV20Sizer):
