@@ -419,7 +419,7 @@ def parse_args(pargs=None):
                         required=False, action='store',
                         help='TimeFrame for Resample/Replay')
 
-    parser.add_argument('--compression', default=1, type=int,
+    parser.add_argument('--compression', default=5, type=int,
                         required=False, action='store',
                         help='Compression for Resample/Replay')
 
