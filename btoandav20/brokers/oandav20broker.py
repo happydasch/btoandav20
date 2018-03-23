@@ -232,9 +232,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             if pref not in self.brackets:
                 msg = ('Order fill received for {}, with price {} and size {} '
                        'but order is no longer alive and is not a bracket. '
-                       'Unknown situation')
-                msg.format(order.ref, price, size)
-                self.put_notification(msg, order, price, size)
+                       'Unknown situation {}')
+                msg = msg.format(order.ref, price, size, reason)
+                self.o.put_notification(msg)
                 return
 
             # [main, stopside, takeside], neg idx to array are -3, -2, -1
@@ -245,15 +245,14 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             else:
                 msg = ('Order fill received for {}, with price {} and size {} '
                        'but order is no longer alive and is a bracket. '
-                       'Unknown situation')
-                msg.format(order.ref, price, size)
-                self.put_notification(msg, order, price, size)
+                       'Unknown situation {}')
+                msg = msg.format(order.ref, price, size, reason)
+                self.o.put_notification(msg)
                 return
 
         data = order.data
         pos = self.getposition(data, clone=False)
         psize, pprice, opened, closed = pos.update(size, price)
-
         comminfo = self.getcommissioninfo(data)
 
         closedvalue = closedcomm = 0.0
