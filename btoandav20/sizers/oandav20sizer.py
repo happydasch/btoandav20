@@ -16,18 +16,22 @@ class OandaV20Sizer(bt.Sizer):
         self.o = oandav20store.OandaV20Store(**kwargs)
 
     def _getsizing(self, comminfo, cash, data, isbuy):
+        position = self.broker.getposition(data)
+        if position:
+            return position.size
+
         avail = 0
         name = data.contractdetails['name']
         price = self.o.get_pricing(name)
         if price is not None:
             if isbuy:
-                avail = float(price['unitsAvailable']['default']['long'])
+                avail = int(float(price['unitsAvailable']['default']['long']))
             else:
-                avail = float(price['unitsAvailable']['default']['short'])
+                avail = int(float(price['unitsAvailable']['default']['short']))
         if self.p.percents is not 0:
-            size = avail * (self.p.percents / 100)
+            size = int(avail * (self.p.percents / 100))
         elif self.p.amount is not 0:
-            size = (avail / cash) * self.p.amount
+            size = int((avail / cash) * self.p.amount)
         else:
             size = 0
         return size
@@ -53,6 +57,11 @@ class OandaV20Risk(OandaV20Sizer):
     )
 
     def _getsizing(self, comminfo, cash, data, isbuy):
+
+        position = self.broker.getposition(data)
+        if position:
+            return position.size
+
         name = data.contractdetails['name']
 
         sym_from = name[:3]
@@ -71,17 +80,15 @@ class OandaV20Risk(OandaV20Sizer):
             if price is not None:
                 cash_to_use = cash_to_use / (1 / float(price['closeoutAsk']))
 
-        # risk per pip
+        size = 0
         price_per_pip = cash_to_use / self.p.stoploss
         price = self.o.get_pricing(name)
-
-        size = 0
         if price is not None:
             size = price_per_pip * (1 / 10 ** data.contractdetails['pipLocation'])
             if isbuy:
-                size = min(size, float(price['unitsAvailable']['default']['long']))
+                size = min(size, int(float(price['unitsAvailable']['default']['long'])))
             else:
-                size = min(size, float(price['unitsAvailable']['default']['short']))
+                size = min(size, int(float(price['unitsAvailable']['default']['short'])))
 
         return size
 
