@@ -309,14 +309,15 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
         if order.exectype != bt.Order.Market:
+            okwargs['time-in-force'] = 'GTD'
             okwargs['price'] = order.created.price
             if order.valid is None:
                 # 1 year and datetime.max fail ... 1 month works
-                valid = datetime.utcnow() + timedelta(days=30)
+                gtdtime = datetime.utcnow() + timedelta(days=30)
             else:
-                valid = order.data.num2date(order.valid)
+                gtdtime = order.data.num2date(order.valid)
                 # To timestamp with seconds precision
-                #okwargs['valid'] = int((valid - self._DTEPOCH).total_seconds())
+            okwargs['gtdTime'] = gtdtime
 
         if order.exectype == bt.Order.StopLimit:
             okwargs['priceBound'] = order.created.pricelimit
@@ -325,10 +326,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             okwargs['distance'] = order.trailamount
 
         if stopside is not None:
-            okwargs['stopLossOnFill'] = stopside.price
+            okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails({'price': stopside.price,})
 
         if takeside is not None:
-            okwargs['takeProfitOnFill'] = takeside.price
+            okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails({'price': takeside.price,})
 
         okwargs.update(**kwargs)  # anything from the user
 
