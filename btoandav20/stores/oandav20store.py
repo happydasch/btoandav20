@@ -186,7 +186,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert positions to dict
             for idx, val in enumerate(pos):
                 pos[idx] = val.dict()
-        except (Exception):
+        except Exception as e:
+            self.put_notification(e)
             return None
 
         return pos
@@ -204,7 +205,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert instrumens to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
-        except (Exception):
+        except Exception as e:
+            self.put_notification(e)
             return None
 
         return inst[0] or None
@@ -218,7 +220,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert instrumens to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
-        except (Exception):
+        except Exception as e:
+            self.put_notification(e)
             return None
 
         return inst or None
@@ -232,7 +235,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert prices to dict
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
-        except (Exception):
+        except Exception as e:
+            self.put_notification(e)
             return None
 
         return prices[0] or None
@@ -246,7 +250,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert prices to dict
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
-        except (Exception):
+        except Exception as e:
+            self.put_notification(e)
             return None
 
         return prices or None
