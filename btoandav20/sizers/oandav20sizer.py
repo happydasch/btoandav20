@@ -25,16 +25,16 @@ class OandaV20Sizer(bt.Sizer):
         price = self.o.get_pricing(name)
         if price is not None:
             if isbuy:
-                avail = int(float(price['unitsAvailable']['default']['long']))
+                avail = float(price['unitsAvailable']['default']['long'])
             else:
-                avail = int(float(price['unitsAvailable']['default']['short']))
+                avail = float(price['unitsAvailable']['default']['short'])
         if self.p.percents is not 0:
-            size = int(avail * (self.p.percents / 100))
+            size = avail * (self.p.percents / 100)
         elif self.p.amount is not 0:
-            size = int((avail / cash) * self.p.amount)
+            size = (avail / cash) * self.p.amount
         else:
             size = 0
-        return size
+        return int(size)
 
 class OandaV20Percent(OandaV20Sizer):
 
@@ -86,11 +86,11 @@ class OandaV20Risk(OandaV20Sizer):
         if price is not None:
             size = price_per_pip * (1 / 10 ** data.contractdetails['pipLocation'])
             if isbuy:
-                size = min(size, int(float(price['unitsAvailable']['default']['long'])))
+                size = min(size, float(price['unitsAvailable']['default']['long']))
             else:
-                size = min(size, int(float(price['unitsAvailable']['default']['short'])))
+                size = min(size, float(price['unitsAvailable']['default']['short']))
 
-        return size
+        return int(size)
 
 class OandaV20RiskPercent(OandaV20Sizer):
 
