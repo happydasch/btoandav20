@@ -475,7 +475,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(msg, trans)
             return
 
-        if self._orders.has_key(oid):
+        if oid in self._orders:
             # if the order was created then process the transactions
             self._process_transaction(oid, trans)
         else:
@@ -498,9 +498,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             price = float(trans['price'])
             self.broker._fill(oref, size, price, reason=trans['reason'])
             # store trade ids which were touched by the order
-            if trans.has_key('tradeOpened'):
+            if 'tradeOpened' in trans:
                 self._orders[trans['tradeOpened']['tradeID']] = oref
-            if trans.has_key('tradeReduced'):
+            if 'tradeReduced' in trans:
                 self._orders[trans['tradeReduced']['tradeID']] = oref
 
         elif ttype in self._X_CANCEL_TRANS:
@@ -535,7 +535,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._orders[oid] = oref
 
             # process transactions after id mapping was added
-            if self._transactions.has_key(oid):
+            if oid in self._transactions:
                 tpending = self._transactions.pop(oid)
                 for trans in tpending:
                     self._process_transaction(oid, trans)
