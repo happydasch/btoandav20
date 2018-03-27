@@ -314,11 +314,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
 
-        if order.exectype != bt.Order.Market and (stopside is not None or takeside is not None):
-            # check for bracket order, if provided take and stop side, execute the order as a market order
-            # since the main order with limit type the price is not far enough, the order will not get executed
-            okwargs['type'] = self._ORDEREXECS[bt.Order.Market]
-        elif order.exectype != bt.Order.Market:
+        if order.exectype != bt.Order.Market:
             okwargs['price'] = order.created.price
             if order.valid is None:
                 okwargs['timeInForce'] = 'GTC' # good to cancel
