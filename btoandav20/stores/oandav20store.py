@@ -58,6 +58,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     _DTEPOCH = datetime(1970, 1, 1)
 
     # Oanda supported granularities
+    '''S5, S10, S15, S30, M1, M2, M3, M4, M5, M10, M15, M30, H1, H2, H3, H4, H6, H8, H12, D, W, M'''
     _GRANULARITIES = {
         (bt.TimeFrame.Seconds, 5): 'S5',
         (bt.TimeFrame.Seconds, 10): 'S10',
@@ -65,6 +66,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         (bt.TimeFrame.Seconds, 30): 'S30',
         (bt.TimeFrame.Minutes, 1): 'M1',
         (bt.TimeFrame.Minutes, 2): 'M2',
+        (bt.TimeFrame.Minutes, 3): 'M3',
         (bt.TimeFrame.Minutes, 4): 'M4',
         (bt.TimeFrame.Minutes, 5): 'M5',
         (bt.TimeFrame.Minutes, 10): 'M10',
