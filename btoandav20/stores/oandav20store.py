@@ -379,7 +379,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 if msg_type == "transaction.Transaction":
                     self._transaction(msg.dict())
         except Exception as e:
-            q.put(e)
+            self.put_notification(e)
 
     def _t_streaming_prices(self, dataname, q, tmout):
         '''Callback method for streaming prices'''
@@ -396,7 +396,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     # put price into queue as dict
                     q.put(msg.dict())
         except Exception as e:
-            q.put(e)
+            self.put_notification(e)
 
     def _t_account(self):
         '''Callback method for account request'''
