@@ -313,15 +313,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         okwargs['instrument'] = order.data._dataname
         okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
-        if order.exectype != bt.Order.Market:
-            okwargs['timeInForce'] = 'GTD' # good to date
+
+        if order.exectype != bt.Order.Market and (stopside is not None or takeside is not None):
+            # check for bracket order, if provided take and stop side, execute the order as a market order
+            # since the main order with limit type the price is not far enough, the order will not get executed
+            okwargs['type'] = self._ORDEREXECS[bt.Order.Market]
+        elif order.exectype != bt.Order.Market:
             okwargs['price'] = order.created.price
             if order.valid is None:
-                # 1 year and datetime.max fail ... 1 month works
-                gtdtime = datetime.utcnow() + timedelta(days = 30)
+                okwargs['timeInForce'] = 'GTC' # good to cancel
             else:
+                okwargs['timeInForce'] = 'GTD' # good to date
                 gtdtime = order.data.num2date(order.valid)
-            okwargs['gtdTime'] = gtdtime.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+                okwargs['gtdTime'] = gtdtime.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
 
         if order.exectype == bt.Order.StopLimit:
             okwargs['priceBound'] = order.created.pricelimit
@@ -340,7 +344,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
-
         self.q_ordercreate.put((order.ref, okwargs,))
         return order
 
@@ -451,9 +454,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     _X_CREATE_TRANS = ['MARKET_ORDER',
                        'LIMIT_ORDER',
                        'STOP_ORDER',
+                       'TAKE_PROFIT_ORDER',
+                       'STOP_LOSS_ORDER',
+                       'TRAILING_STOP_LOSS_ORDER',
                        'MARKET_IF_TOUCHED_ORDER',]
     _X_FILL_TRANS   = ['ORDER_FILL',]
-    _X_CANCEL_TRANS = ['ORDER_CANCEL',]
+    _X_CANCEL_TRANS = ['ORDER_CANCEL',
+                       'MARKET_ORDER_REJECT',
+                       'LIMIT_ORDER_REJECT',
+                       'STOP_ORDER_REJECT',
+                       'TAKE_PROFIT_ORDER_REJECT',
+                       'STOP_LOSS_ORDER_REJECT',
+                       'TRAILING_STOP_LOSS_ORDER_REJECT',
+                       'MARKET_IF_TOUCHED_ORDER_REJECT',]
 
     def _transaction(self, trans):
         oid = None
