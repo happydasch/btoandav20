@@ -13,6 +13,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from decimal import Decimal
 
 
 class MetaSingleton(MetaParams):
@@ -317,7 +318,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         okwargs['type'] = self._ORDEREXECS[order.exectype]
 
         if order.exectype != bt.Order.Market:
-            okwargs['price'] = order.created.price
+            price = Decimal(order.created.price).quantize(order.data.contractdetails['displayPrecision'])
+            okwargs['price'] = price
             if order.valid is None:
                 okwargs['timeInForce'] = 'GTC' # good to cancel
             else:
@@ -332,13 +334,15 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             okwargs['distance'] = order.trailamount
 
         if stopside is not None and stopside.price is not None:
+            price = Decimal(stopside.price).quantize(order.data.contractdetails['displayPrecision'])
             okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails(
-                price = stopside.price
+                price = price
             ).dict()
 
         if takeside is not None and takeside.price is not None:
+            price = Decimal(takeside.price).quantize(order.data.contractdetails['displayPrecision'])
             okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails(
-                price = takeside.price
+                price = price
             ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
