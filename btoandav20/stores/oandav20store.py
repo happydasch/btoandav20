@@ -347,7 +347,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         if takeside is not None and takeside.price is not None:
             okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails(
-                format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision'])
+                price = format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision'])
             ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
