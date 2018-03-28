@@ -326,8 +326,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         okwargs['type'] = self._ORDEREXECS[order.exectype]
 
         if order.exectype != bt.Order.Market:
-            price = Decimal(order.created.price).quantize(order.data.contractdetails['displayPrecision'])
-            okwargs['price'] = price
+            okwargs['price'] = format(order.created.price, '.%df' % order.data.contractdetails['displayPrecision'])
             if order.valid is None:
                 okwargs['timeInForce'] = 'GTC' # good to cancel
             else:
@@ -342,15 +341,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             okwargs['distance'] = order.trailamount
 
         if stopside is not None and stopside.price is not None:
-            price = Decimal(stopside.price).quantize(order.data.contractdetails['displayPrecision'])
             okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails(
-                price = price
+                price = format(stopside.price, '.%df' % order.data.contractdetails['displayPrecision'])
             ).dict()
 
         if takeside is not None and takeside.price is not None:
-            price = Decimal(takeside.price).quantize(order.data.contractdetails['displayPrecision'])
             okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails(
-                price = price
+                format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision'])
             ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
