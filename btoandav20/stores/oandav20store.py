@@ -41,15 +41,21 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
       - ``practice`` (default: ``False``): use the test environment
 
-      - ``account_tmout`` (default: ``10.0``): refresh period for account
+      - ``account_poll_freq`` (default: ``10.0``): refresh frequency for account
         value/cash refresh
+
+     - ``stream_timeout`` (default: ``10``): timeout for stream requests
+
+     - ``poll_timeout`` (default: ``2``): timeout for poll requests
     '''
 
     params = (
         ('token', ''),
         ('account', ''),
         ('practice', False),
-        ('account_tmout', 10.0),  # account balance refresh timeout
+        ('account_poll_freq', 10.0),  # account balance refresh timeout
+        ('stream_timeout', 10),
+        ('poll_timeout', 2),
     )
 
     BrokerCls = None  # broker class will auto register
@@ -131,6 +137,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # init oanda v20 api context
         self.oapi = v20.Context(
             self._OAPI_URL[int(self.p.practice)],
+            poll_timeout=self.p.poll_timeout,
             port=443,
             ssl=True,
             token=self.p.token,
@@ -140,6 +147,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # init oanda v20 api stream context
         self.oapi_stream = v20.Context(
             self._OAPI_STREAM_URL[int(self.p.practice)],
+            stream_timeout=self.p.stream_timeout,
             port=443,
             ssl=True,
             token=self.p.token,
@@ -290,7 +298,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t.start()
 
         # Wait once for the values to be set
-        self._evt_acct.wait(self.p.account_tmout)
+        self._evt_acct.wait(self.p.account_poll_freq)
 
     def streaming_events(self, tmout=None):
         '''Creates threads for event streaming'''
@@ -402,7 +410,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         '''Callback method for account request'''
         while True:
             try:
-                msg = self.q_account.get(timeout=self.p.account_tmout)
+                msg = self.q_account.get(timeout=self.p.account_poll_freq)
                 if msg is None:
                     break  # end of thread
             except queue.Empty:  # tmout -> time to refresh
@@ -422,6 +430,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             except KeyError:
                 pass
 
+            # notify of success, initialization waits for it
             self._evt_acct.set()
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
