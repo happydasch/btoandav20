@@ -112,32 +112,21 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
                               size=pos.size, price=pos.price,
                               exectype=Order.Market,
                               simulated=True)
-
-            order.addcomminfo(self.getcommissioninfo(data))
-            order.execute(0, pos.size, pos.price,
-                          0, 0.0, 0.0,
-                          pos.size, 0.0, 0.0,
-                          0.0, 0.0,
-                          pos.size, pos.price)
-
-            order.completed()
-            self.notify(order)
-
-        elif pos.size > 0:
+        else:
             order = BuyOrder(data=data,
                              size=pos.size, price=pos.price,
                              exectype=Order.Market,
                              simulated=True)
 
-            order.addcomminfo(self.getcommissioninfo(data))
-            order.execute(0, pos.size, pos.price,
-                          0, 0.0, 0.0,
-                          pos.size, 0.0, 0.0,
-                          0.0, 0.0,
-                          pos.size, pos.price)
+        order.addcomminfo(self.getcommissioninfo(data))
+        order.execute(0, pos.size, pos.price,
+                      0, 0.0, 0.0,
+                      pos.size, 0.0, 0.0,
+                      0.0, 0.0,
+                      pos.size, pos.price)
 
-            order.completed()
-            self.notify(order)
+        order.completed()
+        self.notify(order)
 
     def stop(self):
         super(OandaV20Broker, self).stop()
@@ -224,6 +213,10 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             for o in br:
                 if o.alive():
                     self._cancel(o.ref)
+
+    def _fillExternal(self, instrument, size, price):
+        pos = self.positions[instrument]
+        pos.update(size, price)
 
     def _fill(self, oref, size, price, reason, **kwargs):
         order = self.orders[oref]

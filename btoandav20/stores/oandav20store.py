@@ -13,7 +13,6 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
-from decimal import Decimal
 
 
 class MetaSingleton(MetaParams):
@@ -132,7 +131,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._env = None  # reference to cerebro for general notifications
         self._evt_acct = threading.Event()
         self._orders = collections.OrderedDict()  # map order.ref to order id
-        self._transactions = collections.defaultdict(collections.deque) # store pending transactions
 
         # init oanda v20 api context
         self.oapi = v20.Context(
@@ -350,6 +348,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 price = format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision'])
             ).dict()
 
+        # store backtrader order ref in client extensions
+        okwargs['clientExtensions'] = v20.transaction.ClientExtensions(
+            id = str(order.ref)
+        ).dict()
+
         okwargs.update(**kwargs)  # anything from the user
         self.q_ordercreate.put((order.ref, okwargs,))
         return order
@@ -481,9 +484,20 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         ttype = trans['type']
         if ttype in self._X_CREATE_TRANS:
             oid = trans['id']
+            # check for reference of backtrader order
+            if 'clientExtensions' in trans:
+                # store transaction id (order id) with backtrader order reference
+                self._orders[oid] = int(trans['clientExtensions']['id'])
 
         elif ttype in self._X_FILL_TRANS:
             oid = trans['orderID']
+            # unknown order contains trades being closed
+            if 'tradesClosed' in trans:
+                for trade in trans['tradesClosed']:
+                    size = float(trade['units'])
+                    price = float(trans['price'])
+                    # existing trade was closed, update position size
+                    self.broker._fillExternal(trans['instrument'], size, price)
 
         elif ttype in self._X_CANCEL_TRANS:
             oid = trans['orderID']
@@ -502,9 +516,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         if oid in self._orders:
             # if the order was created then process the transactions
             self._process_transaction(oid, trans)
-        else:
-            # if the order is unknown, store transaction for later processing in order_create
-            self._transactions[oid].append(trans)
 
     def _process_transaction(self, oid, trans):
         try:
@@ -552,17 +563,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.put_notification(e)
                 self.broker._reject(oref)
                 break
-
-            # use the id of the transaction which created
-            # the order, this will be the order id
-            oid = o.id
-            self._orders[oid] = oref
-
-            # process transactions after id mapping was added
-            if oid in self._transactions:
-                tpending = self._transactions.pop(oid)
-                for trans in tpending:
-                    self._process_transaction(oid, trans)
 
     def _t_order_cancel(self):
         while True:
