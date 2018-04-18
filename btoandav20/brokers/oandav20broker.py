@@ -107,6 +107,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
     def data_started(self, data):
         pos = self.getposition(data)
 
+        if pos.size == 0:
+            return
+
         if pos.size < 0:
             order = SellOrder(data=data,
                               size=pos.size, price=pos.price,
