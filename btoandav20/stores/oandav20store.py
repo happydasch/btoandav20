@@ -60,7 +60,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     BrokerCls = None  # broker class will auto register
     DataCls = None  # data class will auto register
 
-
     _DTEPOCH = datetime(1970, 1, 1)
 
     # Oanda supported granularities
@@ -462,14 +461,15 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         q.put({})  # end of transmission'''
 
+    # transactions which will be emitted on creating/accepting a order
     _X_CREATE_TRANS = ['MARKET_ORDER',
                        'LIMIT_ORDER',
                        'STOP_ORDER',
                        'TAKE_PROFIT_ORDER',
-                       'STOP_LOSS_ORDER',
-                       'TRAILING_STOP_LOSS_ORDER',
-                       'MARKET_IF_TOUCHED_ORDER',]
+                       'STOP_LOSS_ORDER',]
+    # transactions which filled orders
     _X_FILL_TRANS   = ['ORDER_FILL',]
+    # transactions which cancelled orders
     _X_CANCEL_TRANS = ['ORDER_CANCEL',
                        'MARKET_ORDER_REJECT',
                        'LIMIT_ORDER_REJECT',
@@ -482,6 +482,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def _transaction(self, trans):
         oid = None
         ttype = trans['type']
+        print(trans)
+        
+        if ttype in self._X_CREATE_TRANS:
+            # identify backtrader order by checking client extensions (this is used when creating a order)
+            if 'clientExtensions' in trans:
+                # assume backtrader created the order for this transaction
+                pass
+            else:
+                # external order created this transaction
+                pass
+        '''
         if ttype in self._X_CREATE_TRANS:
             oid = trans['id']
             # check for reference of backtrader order
@@ -513,11 +524,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(msg, trans)
             return
 
+        print(oid, trans)        
         if oid in self._orders:
             # if the order was created then process the transactions
             self._process_transaction(oid, trans)
+        '''
 
     def _process_transaction(self, oid, trans):
+        '''
         try:
             # get a reference to a backtrader order based on the order id / trade id
             oref = self._orders[oid]
@@ -546,6 +560,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.broker._cancel(oref)
             else:  # default action
                 self.broker._reject(oref)
+        '''
 
     def _t_order_create(self):
         while True:
@@ -562,7 +577,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             except Exception as e:
                 self.put_notification(e)
                 self.broker._reject(oref)
-                break
+                continue
 
     def _t_order_cancel(self):
         while True:
@@ -577,6 +592,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 # TODO either close pending orders or filled trades
                 response = self.oapi.trade.close(self.p.account, oid)
             except Exception as e:
-                continue  # not cancelled - FIXME: notify
+                self.put_notification(e)
+                continue
 
             self.broker._cancel(oref)
+
