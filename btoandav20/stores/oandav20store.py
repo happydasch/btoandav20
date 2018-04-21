@@ -475,15 +475,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'LIMIT_ORDER_REJECT',
                        'STOP_ORDER_REJECT',
                        'TAKE_PROFIT_ORDER_REJECT',
-                       'STOP_LOSS_ORDER_REJECT',
-                       'TRAILING_STOP_LOSS_ORDER_REJECT',
-                       'MARKET_IF_TOUCHED_ORDER_REJECT',]
+                       'STOP_LOSS_ORDER_REJECT',]
+    # transactions which can be ignored
+    _X_IGNORE_TRANS = ['DAILY_FINANCING',]
 
     def _transaction(self, trans):
         oid = None
         ttype = trans['type']
-        print(trans)
-        
+
         if ttype in self._X_CREATE_TRANS:
             # identify backtrader order by checking client extensions (this is used when creating a order)
             if 'clientExtensions' in trans:
@@ -492,6 +491,31 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             else:
                 # external order created this transaction
                 pass
+        elif ttype in self._X_FILL_TRANS:
+            # order was filled, notify backtrader of it
+            pass
+        elif ttype in self._X_CANCEL_TRANS:
+            # order was cancelled, notify backtrader of it
+            pass
+        elif ttype in self._X_IGNORE_TRANS:
+            # transaction can be ignored
+            pass
+        else:
+            # go away gracefully
+            try:
+                oid = trans['id']
+            except KeyError:
+                pass
+
+            msg = 'Received {} with oid {}. Unknown situation'
+            msg = msg.format(ttype, oid)
+            self.put_notification(msg, trans)
+            return
+
+        if oid in self._orders:
+            # when an order id exists process transaction
+            self._process_transaction(oid, trans)
+
         '''
         if ttype in self._X_CREATE_TRANS:
             oid = trans['id']
@@ -513,18 +537,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         elif ttype in self._X_CANCEL_TRANS:
             oid = trans['orderID']
 
-        else:  # Go away gracefully
-            try:
-                oid = trans['id']
-            except KeyError:
-                pass
 
-            msg = 'Received {} with oid {}. Unknown situation'
-            msg = msg.format(ttype, oid)
-            self.put_notification(msg, trans)
-            return
 
-        print(oid, trans)        
+        print(oid, trans)
         if oid in self._orders:
             # if the order was created then process the transactions
             self._process_transaction(oid, trans)
