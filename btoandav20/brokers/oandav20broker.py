@@ -160,62 +160,42 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         order = self.orders[oref]
         order.submit(self)
         self.notify(order)
-        for o in self._bracketnotif(order):
-            o.submit(self)
-            self.notify(o)
 
     def _reject(self, oref):
         order = self.orders[oref]
         order.reject(self)
         self.notify(order)
-        self._bracketize(order, cancel=True)
 
     def _accept(self, oref):
         order = self.orders[oref]
         order.accept()
         self.notify(order)
-        for o in self._bracketnotif(order):
-            o.accept(self)
-            self.notify(o)
 
     def _cancel(self, oref):
         order = self.orders[oref]
         order.cancel()
         self.notify(order)
-        self._bracketize(order, cancel=True)
 
     def _expire(self, oref):
         order = self.orders[oref]
         order.expire()
         self.notify(order)
-        self._bracketize(order, cancel=True)
 
-    def _bracketnotif(self, order):
-        pref = getattr(order.parent, 'ref', order.ref)  # parent ref or self
-        br = self.brackets.get(pref, None)  # to avoid recursion
-        return br[-2:] if br is not None else []
-
-    def _bracketize(self, order, cancel=False):
+    def _bracketize(self, order):
         pref = getattr(order.parent, 'ref', order.ref)  # parent ref or self
         br = self.brackets.pop(pref, None)  # to avoid recursion
         if br is None:
             return
 
-        if not cancel:
-            if len(br) == 3:  # all 3 orders in place, parent was filled
-                br = br[1:]  # discard index 0, parent
-                for o in br:
-                    o.activate()  # simulate activate for children
-                self.brackets[pref] = br  # not done - reinsert children
-
-            elif len(br) == 2:  # filling a children
-                oidx = br.index(order)  # find index to filled (0 or 1)
-                self._cancel(br[1 - oidx].ref)  # cancel remaining (1 - 0 -> 1)
-        else:
-            # Any cancellation cancel the others
+        if len(br) == 3:  # all 3 orders in place, parent was filled
+            br = br[1:]  # discard index 0, parent
             for o in br:
-                if o.alive():
-                    self._cancel(o.ref)
+                o.activate()  # simulate activate for children
+            self.brackets[pref] = br  # not done - reinsert children
+
+        elif len(br) == 2:  # filling a children
+            oidx = br.index(order)  # find index to filled (0 or 1)
+            self._cancel(br[1 - oidx].ref)  # cancel remaining (1 - 0 -> 1)
 
     def _fillExternal(self, instrument, size, price):
         pos = self.positions[instrument]
@@ -286,7 +266,7 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
                 self.o.order_create(parent, stopside, takeside)
                 return takeside  # parent was already returned
 
-            else:  # Parent order, which is not being transmitted
+            else:  # Parent order, which is being transmitted
                 self.orders[order.ref] = order
                 return self.o.order_create(order)
 

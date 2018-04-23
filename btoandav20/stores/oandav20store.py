@@ -13,6 +13,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from oandapyV20.contrib.requests.extensions import ClientExtensions
 
 
 class MetaSingleton(MetaParams):
@@ -339,12 +340,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         if stopside is not None and stopside.price is not None:
             okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails(
-                price = format(stopside.price, '.%df' % order.data.contractdetails['displayPrecision'])
+                price = format(stopside.price, '.%df' % order.data.contractdetails['displayPrecision']),
+                clientExtensions = v20.transaction.ClientExtensions(
+                    id = str(stopside.ref)
+                ).dict()
             ).dict()
 
         if takeside is not None and takeside.price is not None:
             okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails(
-                price = format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision'])
+                price = format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision']),
+                clientExtensions = v20.transaction.ClientExtensions(
+                    id = str(takeside.ref)
+                ).dict()
             ).dict()
 
         # store backtrader order ref in client extensions
@@ -470,8 +477,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     # transactions which filled orders
     _X_FILL_TRANS   = ['ORDER_FILL',]
     # transactions which cancelled orders
-    _X_CANCEL_TRANS = ['ORDER_CANCEL',
-                       'MARKET_ORDER_REJECT',
+    _X_CANCEL_TRANS = ['ORDER_CANCEL',]
+    # transactions which were rejected
+    _X_REJECT_TRANS = ['MARKET_ORDER_REJECT',
                        'LIMIT_ORDER_REJECT',
                        'STOP_ORDER_REJECT',
                        'TAKE_PROFIT_ORDER_REJECT',
@@ -484,22 +492,34 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         ttype = trans['type']
 
         if ttype in self._X_CREATE_TRANS:
+            # get order id (matches transaction id)
+            oid = trans['id']
+            oref = None
             # identify backtrader order by checking client extensions (this is used when creating a order)
             if 'clientExtensions' in trans:
                 # assume backtrader created the order for this transaction
-                pass
-            else:
-                # external order created this transaction
-                pass
+                oref = int(trans['clientExtensions']['id'])
+            if oref is not None:
+                self._orders[oid] = oref
+
         elif ttype in self._X_FILL_TRANS:
             # order was filled, notify backtrader of it
-            pass
+            oid = trans['orderID']
+
         elif ttype in self._X_CANCEL_TRANS:
             # order was cancelled, notify backtrader of it
-            pass
+            oid = trans['orderID']
+
+        elif ttype in self._X_IGNORE_TRANS:
+            # transaction was rejected, notify backtrader of it
+            oid = trans['orderID']
+
         elif ttype in self._X_IGNORE_TRANS:
             # transaction can be ignored
-            pass
+            msg = 'Received transaction {} with oid {}. Ignoring.'
+            msg = msg.format(ttype, oid)
+            self.put_notification(msg, trans)
+
         else:
             # go away gracefully
             try:
@@ -507,7 +527,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             except KeyError:
                 pass
 
-            msg = 'Received {} with oid {}. Unknown situation'
+            msg = 'Received transaction {} with oid {}. Unknown situation.'
             msg = msg.format(ttype, oid)
             self.put_notification(msg, trans)
             return
@@ -515,38 +535,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         if oid in self._orders:
             # when an order id exists process transaction
             self._process_transaction(oid, trans)
-
-        '''
-        if ttype in self._X_CREATE_TRANS:
-            oid = trans['id']
-            # check for reference of backtrader order
-            if 'clientExtensions' in trans:
-                # store transaction id (order id) with backtrader order reference
-                self._orders[oid] = int(trans['clientExtensions']['id'])
-
-        elif ttype in self._X_FILL_TRANS:
-            oid = trans['orderID']
-            # unknown order contains trades being closed
-            if 'tradesClosed' in trans:
-                for trade in trans['tradesClosed']:
-                    size = float(trade['units'])
-                    price = float(trans['price'])
-                    # existing trade was closed, update position size
-                    self.broker._fillExternal(trans['instrument'], size, price)
-
-        elif ttype in self._X_CANCEL_TRANS:
-            oid = trans['orderID']
-
-
-
-        print(oid, trans)
-        if oid in self._orders:
-            # if the order was created then process the transactions
-            self._process_transaction(oid, trans)
-        '''
+        else:
+            # external order created this transaction
+            # TODO check for trades, if known trades are affected, try to fullfill transaction, if needed create a simulated order
+            msg = 'Received external transaction {} with oid {}. Positions and trades may not match anymore.'
+            msg = msg.format(ttype, oid)
+            self.put_notification(msg, trans)
 
     def _process_transaction(self, oid, trans):
-        '''
         try:
             # get a reference to a backtrader order based on the order id / trade id
             oref = self._orders[oid]
@@ -571,11 +567,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             reason = trans['reason']
             if reason == 'TIME_IN_FORCE_EXPIRED':
                 self.broker._expire(oref)
-            elif reason == 'CLIENT_REQUEST':
+            else:
                 self.broker._cancel(oref)
-            else:  # default action
+
+        elif ttype in self._X_REJECT_TRANS:
                 self.broker._reject(oref)
-        '''
 
     def _t_order_create(self):
         while True:
