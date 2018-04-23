@@ -361,6 +361,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         okwargs.update(**kwargs)  # anything from the user
         self.q_ordercreate.put((order.ref, okwargs,))
+
+        # notify orders of being submitted
+        self.broker._submit(order.ref)
+        if stopside is not None and stopside.price is not None:
+            self.broker._submit(stopside.ref)
+        if takeside is not None and takeside.price is not None:
+            self.broker._submit(takeside.ref)
+
         return order
 
     def order_cancel(self, order):
@@ -584,7 +592,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 response = self.oapi.order.create(self.p.account, order=okwargs)
                 # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
-                self.broker._submit(oref)
             except Exception as e:
                 self.put_notification(e)
                 self.broker._reject(oref)

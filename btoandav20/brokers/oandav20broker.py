@@ -158,12 +158,12 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
 
     def _submit(self, oref):
         order = self.orders[oref]
-        order.submit(self)
+        order.submit()
         self.notify(order)
 
     def _reject(self, oref):
         order = self.orders[oref]
-        order.reject(self)
+        order.reject()
         self.notify(order)
 
     def _accept(self, oref):
