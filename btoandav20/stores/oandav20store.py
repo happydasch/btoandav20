@@ -61,8 +61,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     BrokerCls = None  # broker class will auto register
     DataCls = None  # data class will auto register
 
-    _DTEPOCH = datetime(1970, 1, 1)
-
     # Oanda supported granularities
     '''S5, S10, S15, S30, M1, M2, M3, M4, M5, M10, M15, M30, H1, H2, H3, H4, H6, H8, H12, D, W, M'''
     _GRANULARITIES = {
@@ -457,22 +455,37 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         dtkwargs = {}
         if dtbegin is not None:
-            dtkwargs['from'] = int((dtbegin - self._DTEPOCH).total_seconds())
-            dtkwargs['includeFirst'] = int(includeFirst)
+            dtkwargs['fromTime'] = dtbegin.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+            dtkwargs['includeFirst'] = includeFirst
 
         if dtend is not None:
-            dtkwargs['to'] = int((dtend - self._DTEPOCH).total_seconds())
+            dtkwargs['toTime'] = dtend.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
 
-        try:
-            response = self.oapi.instrument.candles(dataname,
-                                             granularity=granularity,
-                                             price=candleFormat,
-                                             **dtkwargs)
-        except Exception as e:
-            return
+        count = 0
+        while True:
+            count += 1
+            if count > 1: dtkwargs['includeFirst'] = False
+            try:
+                response = self.oapi.instrument.candles(dataname,
+                                                 granularity=granularity,
+                                                 price=candleFormat,
+                                                 **dtkwargs)
+                candles = response.get('candles', 200)
+            except Exception as e:
+                self.put_notification(e)
+                return
 
-        for candle in response.get('candles'):
-            q.put(candle.dict())
+            dtobj = None
+            for candle in candles:
+                q.put(candle.dict())
+                dtobj = datetime.utcfromtimestamp(float(candle.time))
+
+            if dtobj is not None:
+                dtkwargs['fromTime'] = dtobj.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+            elif dtobj is None:
+                break
+            if len(candles) == 0:
+                break
 
         q.put({})  # end of transmission'''
 
@@ -545,7 +558,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._process_transaction(oid, trans)
         else:
             # external order created this transaction
-            # TODO check for trades, if known trades are affected, try to fullfill transaction, if needed create a simulated order
+            if self.broker.p.use_positions:
+                pass
+                # TODO check for trades, if known trades are affected, try to fullfill transaction, if needed create a simulated order
             msg = 'Received external transaction {} with oid {}. Positions and trades may not match anymore.'
             msg = msg.format(ttype, oid)
             self.put_notification(msg, trans)
