@@ -197,9 +197,30 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             oidx = br.index(order)  # find index to filled (0 or 1)
             self._cancel(br[1 - oidx].ref)  # cancel remaining (1 - 0 -> 1)
 
-    def _fillExternal(self, instrument, size, price):
-        pos = self.positions[instrument]
-        pos.update(size, price)
+    def _fill_external(self, data, size, price):
+        if size == 0:
+            return
+
+        if size < 0:
+            order = SellOrder(data=data,
+                              size=size, price=price,
+                              exectype=Order.Market,
+                              simulated=True)
+        else:
+            order = BuyOrder(data=data,
+                             size=size, price=price,
+                             exectype=Order.Market,
+                             simulated=True)
+
+        order.addcomminfo(self.getcommissioninfo(data))
+        order.execute(0, size, price,
+                      0, 0.0, 0.0,
+                      size, 0.0, 0.0,
+                      0.0, 0.0,
+                      size, price)
+
+        order.completed()
+        self.notify(order)
 
     def _fill(self, oref, size, price, reason, **kwargs):
         order = self.orders[oref]

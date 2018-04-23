@@ -558,12 +558,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._process_transaction(oid, trans)
         else:
             # external order created this transaction
-            if self.broker.p.use_positions:
-                pass
-                # TODO check for trades, if known trades are affected, try to fullfill transaction, if needed create a simulated order
-            msg = 'Received external transaction {} with oid {}. Positions and trades may not match anymore.'
-            msg = msg.format(ttype, oid)
-            self.put_notification(msg, trans)
+            if self.broker.p.use_positions and ttype in self._X_FILL_TRANS:
+                size = float(trans['units'])
+                price = float(trans['price'])
+                for data in self.datas:
+                    if data._name == trans['instrument']:
+                        self.broker._fill_external(data, size, price)
+                        break
+            else:
+                msg = 'Received external transaction {} with oid {}. Positions and trades may not match anymore.'
+                msg = msg.format(ttype, oid)
+                self.put_notification(msg, trans)
 
     def _process_transaction(self, oid, trans):
         try:
