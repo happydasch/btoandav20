@@ -531,7 +531,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # order was cancelled, notify backtrader of it
             oid = trans['orderID']
 
-        elif ttype in self._X_IGNORE_TRANS:
+        elif ttype in self._X_REJECT_TRANS:
             # transaction was rejected, notify backtrader of it
             oid = trans['orderID']
 
