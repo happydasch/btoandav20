@@ -537,19 +537,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         elif ttype in self._X_IGNORE_TRANS:
             # transaction can be ignored
-            msg = 'Received transaction {} with oid {}. Ignoring.'
-            msg = msg.format(ttype, oid)
+            msg = 'Received transaction {} with id {}. Ignoring.'
+            msg = msg.format(ttype, trans['id'])
             self.put_notification(msg, trans)
 
         else:
-            # go away gracefully
-            try:
-                oid = trans['id']
-            except KeyError:
-                pass
-
-            msg = 'Received transaction {} with oid {}. Unknown situation.'
-            msg = msg.format(ttype, oid)
+            msg = 'Received transaction {} with id {}. Unknown situation.'
+            msg = msg.format(ttype, trans['id'])
             self.put_notification(msg, trans)
             return
 
@@ -565,9 +559,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     if data._name == trans['instrument']:
                         self.broker._fill_external(data, size, price)
                         break
-            else:
-                msg = 'Received external transaction {} with oid {}. Positions and trades may not match anymore.'
-                msg = msg.format(ttype, oid)
+            elif ttype not in self._X_IGNORE_TRANS:
+                # notify about unknown transaction
+                msg = 'Received external transaction {} with id {}. Positions and trades may not match anymore.'
+                msg = msg.format(ttype, trans['id'])
                 self.put_notification(msg, trans)
 
     def _process_transaction(self, oid, trans):
