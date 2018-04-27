@@ -201,6 +201,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         if size == 0:
             return
 
+        pos = self.getposition(data, clone=False)
+        pos.update(size, price)
+
         if size < 0:
             order = SellOrder(data=data,
                               size=size, price=price,
