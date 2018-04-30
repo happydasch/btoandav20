@@ -532,7 +532,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         elif ttype in self._X_REJECT_TRANS:
             # transaction was rejected, notify backtrader of it
-            oid = trans['orderID']
+            oid = trans['requestID']
 
         elif ttype in self._X_IGNORE_TRANS:
             # transaction can be ignored
