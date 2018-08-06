@@ -631,4 +631,3 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 continue
 
             self.broker._cancel(oref)
-

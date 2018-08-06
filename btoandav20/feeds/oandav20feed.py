@@ -29,7 +29,7 @@ from backtrader.utils.py3 import (integer_types, queue, string_types,
                                   with_metaclass)
 from backtrader.metabase import MetaParams
 
-from btoandav20.stores import oandav20store
+from ..stores import oandav20store
 
 class MetaOandaV20Data(DataBase.__class__):
     def __init__(cls, name, bases, dct):
