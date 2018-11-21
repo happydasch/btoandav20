@@ -92,11 +92,6 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         If ``True`` the *ask* part of the *bidask* prices will be used instead
         of the default use of *bid*
 
-      - ``includeFirst`` (default: ``True``)
-
-        Influence the delivery of the 1st bar of a historical/backfilling
-        request by setting the parameter directly to the Oanda API calls
-
       - ``reconnect`` (default: ``True``)
 
         Reconnect when network connection is down
@@ -109,9 +104,15 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
         Time in seconds to wait in between reconnection attemps
 
+      - ``candles`` (default: ``False``)
+
+        Return candles instead of streaming for current data, granularity needs to be
+        higher than Ticks
+
+
     This data feed supports only this mapping of ``timeframe`` and
     ``compression``, which comply with the definitions in the OANDA API
-    Developer's Guid::
+    Developer's Guide:
 
         (TimeFrame.Seconds, 5): 'S5',
         (TimeFrame.Seconds, 10): 'S10',
@@ -145,8 +146,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         ('backfill_from', None),  # additional data source to do backfill from
         ('bidask', True),
         ('useask', False),
-        ('includeFirst', True),
         ('reconnect', True),
+        ('candles', False),
         ('reconnections', -1),  # forever
         ('reconntimeout', 5.0),
     )
@@ -230,12 +231,12 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 self.p.dataname, dtbegin, dtend,
                 self._timeframe, self._compression,
                 candleFormat=self._candleFormat,
-                includeFirst=self.p.includeFirst)
+                includeFirst=True)
 
             self._state = self._ST_HISTORBACK
             return True
 
-        self.qlive = self.o.streaming_prices(self.p.dataname, tmout=tmout)
+        # depending on candles, either stream or use poll
         if instart:
             self._statelivereconn = self.p.backfill_start
         else:
@@ -243,10 +244,13 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
         if self._statelivereconn:
             self.put_notification(self.DELAYED)
-
-        self._state = self._ST_LIVE
         if instart:
             self._reconns = self.p.reconnections
+
+        if not self.p.candles:
+            self.qlive = self.o.streaming_prices(self.p.dataname, tmout=tmout)
+
+        self._state = self._ST_LIVE
 
         return True  # no return before - implicit continue
 
@@ -268,8 +272,23 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     msg = (self._storedmsg.pop(None, None) or
                            self.qlive.get(timeout=self._qcheck))
                 except queue.Empty:
+                    # request candles in live instead of stream
+                    if self.p.candles:
+                        if len(self) > 1:
+                            # len == 1 ... forwarded for the 1st time
+                            dtbegin = self.datetime.datetime(-1)
+                        elif self.fromdate > float('-inf'):
+                            dtbegin = num2date(self.fromdate)
+                        else:  # 1st bar and no begin set
+                            # passing None to fetch max possible in 1 request
+                            dtbegin = None
+                        self.qlive = self.o.candles(
+                            self.p.dataname, dtbegin, None,
+                            self._timeframe, self._compression,
+                            candleFormat=self._candleFormat,
+                            onlyComplete=True,
+                            includeFirst=False)
                     return None  # indicate timeout situation
-
                 if msg is None:  # Conn broken during historical/backfilling
                     self.put_notification(self.CONNBROKEN)
                     # Try to reconnect
@@ -309,10 +328,13 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     if self._laststatus != self.LIVE:
                         if self.qlive.qsize() <= 1:  # very short live queue
                             self.put_notification(self.LIVE)
-
-                    ret = self._load_tick(msg)
-                    if ret:
-                        return True
+                    if msg:
+                        if self.p.candles:
+                            ret = self._load_candle(msg)
+                        else:
+                            ret = self._load_tick(msg)
+                        if ret:
+                            return True
 
                     # could not load bar ... go and get new one
                     continue
@@ -333,14 +355,14 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 else:  # 1st bar and no begin set
                     # passing None to fetch max possible in 1 request
                     dtbegin = None
-
-                dtend = datetime.utcfromtimestamp(float(msg['time']))
+                if msg:
+                    dtend = datetime.utcfromtimestamp(float(msg['time']))
 
                 self.qhist = self.o.candles(
                     self.p.dataname, dtbegin, dtend,
                     self._timeframe, self._compression,
                     candleFormat=self._candleFormat,
-                    includeFirst=self.p.includeFirst)
+                    includeFirst=True)
 
                 self._state = self._ST_HISTORBACK
                 self._statelivereconn = False  # no longer in live
@@ -361,7 +383,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     return False
 
                 if msg:
-                    if self._load_history(msg):
+                    if self._load_candle(msg):
                         return True  # loading worked
 
                     continue  # not loaded ... date may have been seen
@@ -418,7 +440,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
         return True
 
-    def _load_history(self, msg):
+    def _load_candle(self, msg):
         dtobj = datetime.utcfromtimestamp(float(msg['time']))
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:

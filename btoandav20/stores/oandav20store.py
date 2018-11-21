@@ -374,12 +374,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         return order
 
     def candles(self, dataname, dtbegin, dtend, timeframe, compression,
-                candleFormat, includeFirst):
+                candleFormat, includeFirst=True, onlyComplete=True):
         '''Returns historical rates'''
         q = queue.Queue()
         kwargs = {'dataname': dataname, 'dtbegin': dtbegin, 'dtend': dtend,
                    'timeframe': timeframe, 'compression': compression, 'candleFormat': candleFormat,
-                   'includeFirst': includeFirst, 'q': q}
+                   'includeFirst': includeFirst, 'onlyComplete': onlyComplete, 'q': q}
         t = threading.Thread(target=self._t_candles, kwargs=kwargs)
         t.daemon = True
         t.start()
@@ -445,7 +445,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._evt_acct.set()
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
-                   candleFormat, includeFirst, q):
+                   candleFormat, includeFirst, onlyComplete, q):
         '''Callback method for candles request'''
         granularity = self.get_granularity(timeframe, compression)
         if granularity is None:
@@ -476,8 +476,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             dtobj = None
             for candle in candles:
-                q.put(candle.dict())
-                dtobj = datetime.utcfromtimestamp(float(candle.time))
+                if not onlyComplete or candle.complete:
+                    q.put(candle.dict())
+                    dtobj = datetime.utcfromtimestamp(float(candle.time))
 
             if dtobj is not None:
                 dtkwargs['fromTime'] = dtobj.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
@@ -505,7 +506,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'TAKE_PROFIT_ORDER_REJECT',
                        'STOP_LOSS_ORDER_REJECT',]
     # transactions which can be ignored
-    _X_IGNORE_TRANS = ['DAILY_FINANCING',]
+    _X_IGNORE_TRANS = ['DAILY_FINANCING',
+                       'CLIENT_CONFIGURE']
 
     def _transaction(self, trans):
         oid = None
@@ -631,4 +633,3 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 continue
 
             self.broker._cancel(oref)
-
