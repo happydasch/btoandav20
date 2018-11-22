@@ -236,7 +236,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         t.start()
 
     def _t_poll(self):
-        dtstart = self._getstarttime(self._timeframe, self._compression, offset=2)
+        dtstart = self._getstarttime(self._timeframe, self._compression, offset=1)
         while True:
             dtcurr = self._getstarttime(self._timeframe, self._compression)
             # request candles in live instead of stream
