@@ -4,6 +4,9 @@ from __future__ import (absolute_import, division, print_function,
 
 from datetime import datetime, timedelta
 
+import time as _time
+import threading
+
 from backtrader.feed import DataBase
 from backtrader import TimeFrame, date2num, num2date
 from backtrader.utils.py3 import (integer_types, queue, string_types,
@@ -216,18 +219,101 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             self._statelivereconn = self.p.backfill_start
         else:
             self._statelivereconn = self.p.backfill
-
         if self._statelivereconn:
             self.put_notification(self.DELAYED)
         if instart:
-            self._reconns = self.p.reconnections
-
-        if not self.p.candles:
-            self.qlive = self.o.streaming_prices(self.p.dataname, tmout=tmout)
-
+            if not self.p.candles:
+                self._reconns = self.p.reconnections
+                self.qlive = self.o.streaming_prices(self.p.dataname, tmout=tmout)
+            else:
+                self.poll_thread()
         self._state = self._ST_LIVE
-
         return True  # no return before - implicit continue
+
+    def poll_thread(self):
+        t = threading.Thread(target=self._t_poll)
+        t.daemon = True
+        t.start()
+
+    def _t_poll(self):
+        dtstart = self._getstarttime(self._timeframe, self._compression, offset=2)
+        while True:
+            dtcurr = self._getstarttime(self._timeframe, self._compression)
+            # request candles in live instead of stream
+            if dtcurr > dtstart:
+                if len(self) > 1:
+                    # len == 1 ... forwarded for the 1st time
+                    dtbegin = self.datetime.datetime(-1)
+                elif self.fromdate > float('-inf'):
+                    dtbegin = num2date(self.fromdate)
+                else:  # 1st bar and no begin set
+                    dtbegin = dtstart
+                self.qlive = self.o.candles(
+                    self.p.dataname, dtbegin, None,
+                    self._timeframe, self._compression,
+                    candleFormat=self._candleFormat,
+                    onlyComplete=True,
+                    includeFirst=False)
+                dtstart = dtbegin
+                # sleep until next call
+                dtnow = datetime.utcnow()
+                dtnext = self._getstarttime(self._timeframe, self._compression, dt=dtnow, offset=-1)
+                dtdiff = dtnext - dtnow
+                tmout = (dtdiff.days*24*60*60) + dtdiff.seconds + 1
+                if tmout <= 0: tmout = 5
+                _time.sleep(tmout)
+
+    def _getstarttime(self, timeframe, compression, dt = None, offset = 0):
+        '''This method will return the start of the period based on current
+        time (or provided time). It is using UTC 22:00 (5:00 pm New York)
+        as the start of the day.'''
+        if dt == None:
+            dt = datetime.utcnow()
+        if timeframe == TimeFrame.Seconds:
+            dt = dt.replace(second=(dt.second//compression)*compression, microsecond=0)
+            if offset:
+                dt = dt - timedelta(seconds=compression*offset)
+        elif timeframe == TimeFrame.Minutes:
+            if compression >= 60:
+                hours = 0
+                minutes = 0
+                # get start of day
+                dtstart = self._getstarttime(TimeFrame.Days, 1, dt)
+                #diff start of day with current time to get seconds since start of day
+                dtdiff = dt - dtstart
+                hours = dtdiff.seconds//((60*60)*(compression//60))
+                minutes = compression % 60
+                dt = dtstart + timedelta(hours=hours, minutes=minutes)
+            else:
+                dt = dt.replace(minute=(dt.minute//compression)*compression, second=0, microsecond=0)
+            if offset:
+                dt = dt - timedelta(minutes=compression*offset)
+        elif timeframe == TimeFrame.Days:
+            # start of day is UTC 22 (5pm new york)
+            if dt.hour < 22:
+                dt = dt - timedelta(days=1)
+            if offset:
+                dt = dt - timedelta(days=offset)
+            dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
+        elif timeframe == TimeFrame.Weeks:
+            if dt.weekday() != 6:
+                # sunday is start of week at 5pm new york
+                dt = dt - timedelta(days=dt.weekday() + 1)
+            if offset:
+                dt = dt - timedelta(days=offset * 7)
+            dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
+        elif timeframe == TimeFrame.Months:
+            if offset:
+                dt= dt - timedelta(days=(min(28+dt.day, 31)))
+            # last day of month
+            last_day_of_month = dt.replace(day=28) + timedelta(days=4)
+            last_day_of_month = last_day_of_month - timedelta(days=last_day_of_month.day)
+            last_day_of_month = last_day_of_month.day
+            # start of month (1 at 0, 22 last day of prev month)
+            if dt.day < last_day_of_month:
+                dt = dt - timedelta(days=dt.day)
+            dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
+        return dt
 
     def stop(self):
         '''Stops and tells the store to stop'''
@@ -247,23 +333,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     msg = (self._storedmsg.pop(None, None) or
                            self.qlive.get(timeout=self._qcheck))
                 except queue.Empty:
-                    # request candles in live instead of stream
-                    if self.p.candles:
-                        if len(self) > 1:
-                            # len == 1 ... forwarded for the 1st time
-                            dtbegin = self.datetime.datetime(-1)
-                        elif self.fromdate > float('-inf'):
-                            dtbegin = num2date(self.fromdate)
-                        else:  # 1st bar and no begin set
-                            # passing None to fetch max possible in 1 request
-                            dtbegin = None
-                        self.qlive = self.o.candles(
-                            self.p.dataname, dtbegin, None,
-                            self._timeframe, self._compression,
-                            candleFormat=self._candleFormat,
-                            onlyComplete=True,
-                            includeFirst=False)
                     return None  # indicate timeout situation
+
                 if msg is None:  # Conn broken during historical/backfilling
                     self.put_notification(self.CONNBROKEN)
                     # Try to reconnect
