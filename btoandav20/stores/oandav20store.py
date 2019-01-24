@@ -432,6 +432,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 accinfo = response.get('account', 200)
             except Exception as e:
                 self.put_notification(e)
+                print(e, response.get('errorMessage'))
                 continue
 
             try:
@@ -457,9 +458,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             dtkwargs['fromTime'] = dtbegin.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
             dtkwargs['includeFirst'] = includeFirst
 
-        if dtend is not None:
-            dtkwargs['toTime'] = dtend.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
-
         count = 0
         while True:
             count += 1
@@ -472,17 +470,25 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 candles = response.get('candles', 200)
             except Exception as e:
                 self.put_notification(e)
+                print(e, response.get('errorMessage'))
                 return
 
             dtobj = None
             for candle in candles:
+                # get current candle time
+                dtobj = datetime.utcfromtimestamp(float(candle.time))
+                # if end time is provided, check if time is reached for every candle‚
+                if dtend is not None and dtobj > dtend:
+                    break
+                # add candle
                 if not onlyComplete or candle.complete:
                     q.put(candle.dict())
-                    dtobj = datetime.utcfromtimestamp(float(candle.time))
 
             if dtobj is not None:
                 dtkwargs['fromTime'] = dtobj.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
             elif dtobj is None:
+                break
+            if dtend is not None and dtobj > dtend:
                 break
             if len(candles) == 0:
                 break
