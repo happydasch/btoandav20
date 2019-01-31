@@ -320,6 +320,18 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         super(OandaV20Data, self).stop()
         self.o.stop()
 
+    def replay(self, **kwargs):
+        # save original timeframe and compression to fetch data
+        # they will be overriden when calling replay
+        orig_timeframe = self._timeframe
+        orig_compression = self._compression
+        #setting up replay configuration
+        super(DataBase, self).replay(**kwargs)
+        #putting back original timeframe and compression to fetch correct data
+        #the replay configuration will still use the correct dataframe and compression for strategy
+        self._timeframe = orig_timeframe
+        self._compression = orig_compression
+
     def haslivedata(self):
         return bool(self._storedmsg or self.qlive)  # do not return the objs
 
