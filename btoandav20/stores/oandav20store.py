@@ -5,6 +5,7 @@ from __future__ import (absolute_import, division, print_function,
 import collections
 import json
 import threading
+import copy
 import time as _time
 from datetime import datetime, timedelta
 
@@ -14,6 +15,35 @@ import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
 
+class SerializableEvent(object):
+    '''A threading.Event that can be serialized.'''
+    def __init__(self):
+        self.evt = threading.Event()
+
+    def set(self):
+        return self.evt.set()
+
+    def clear(self):
+        return self.evt.clear()
+
+    def isSet(self):
+        return self.evt.isSet()
+
+    def wait(self, timeout=0):
+        return self.evt.wait(timeout)
+
+    def __getstate__(self):
+        d = copy.copy(self.__dict__)
+        if self.evt.isSet():
+            d['evt'] = True
+        else:
+            d['evt'] = False
+        return d
+
+    def __setstate__(self, d):
+        self.evt = threading.Event()
+        if d['evt']:
+            self.evt.set()
 
 class MetaSingleton(MetaParams):
     '''Metaclass to make a metaclassed class a singleton'''
@@ -126,7 +156,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self.datas = list()  # datas that have registered over start
 
         self._env = None  # reference to cerebro for general notifications
-        self._evt_acct = threading.Event()
+        self._evt_acct = SerializableEvent()
         self._orders = collections.OrderedDict()  # map order.ref to order id
 
         # init oanda v20 api context
