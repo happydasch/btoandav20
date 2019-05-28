@@ -441,7 +441,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 instruments=dataname,
             )
             for msg_type, msg in response.parts():
-                if msg_type == "pricing.Price":
+                # FIXME not sure, why the type is either Price or ClientPrice
+                if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
                     # put price into queue as dict
                     q.put(msg.dict())
         except Exception as e:
