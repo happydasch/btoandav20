@@ -442,6 +442,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             )
             for msg_type, msg in response.parts():
                 # FIXME not sure, why the type is either Price or ClientPrice
+                # https://github.com/ftomassetti/backtrader-oandav20/issues/26
+                # there was already a suggestion to change this, but both
+                # msg_types return the price. Check for both msg_types (Price, ClientPrice)
+                # to fetch all streamed prices.
                 if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
                     # put price into queue as dict
                     q.put(msg.dict())
