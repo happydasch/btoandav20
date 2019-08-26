@@ -148,7 +148,10 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
-        self._candleFormat = 'B' if self.p.bidask else 'M'
+        if self.p.bidask:
+            self._candleFormat = 'A' if self.p.useask else 'B'
+        else:
+            self._candleFormat = 'M'
 
     def setenvironment(self, env):
         '''Receives an environment (cerebro) and passes it over to the store it
