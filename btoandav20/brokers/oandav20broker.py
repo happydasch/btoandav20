@@ -17,7 +17,7 @@ from backtrader.position import Position
 from backtrader.utils import AutoDict, AutoOrderedDict
 from backtrader.comminfo import CommInfoBase
 
-from btoandav20.stores import oandav20store
+from ..stores import oandav20store
 
 class OandaV20CommInfo(CommInfoBase):
     def getvaluesize(self, size, price):
