@@ -189,6 +189,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
         if self.p.backfill_from is not None:
             self._state = self._ST_FROM
+            self.p.backfill_from.setenvironment(self._env)
             self.p.backfill_from._start()
         else:
             self._start_finish()

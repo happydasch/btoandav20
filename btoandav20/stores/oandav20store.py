@@ -512,7 +512,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for candle in candles:
                 # get current candle time
                 dtobj = datetime.utcfromtimestamp(float(candle.time))
-                # if end time is provided, check if time is reached for every candle‚
+                # if end time is provided, check if time is reached for every candle
                 if dtend is not None and dtobj > dtend:
                     break
                 # add candle
