@@ -58,7 +58,6 @@ Available features:
 
 ## Installation
 
-No package is available at the moment so you need to install it manually.
 The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 
 1. Install backtrader ``pip install backtrader[plotting]`` (https://www.backtrader.com/docu/installation.html)
