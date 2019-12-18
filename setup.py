@@ -8,7 +8,7 @@ setuptools.setup(
     version="0.1.0",
     description="Integrate Oanda-V20 API into backtrader",
     long_description=long_description,
-    license='Apache License 2.0',
+    license='GNU General Public License Version 3',
     url="https://github.com/ftomassetti/backtrader-oandav20",
     packages=setuptools.find_packages(),
     install_requires=[

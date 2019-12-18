@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/ftomassetti/backtrader-oandav20.svg?branch=master)](https://travis-ci.org/ftomassetti/backtrader-oandav20)
 
-Support for Oanda-V20 API in backtrader  
+Support for Oanda-V20 API in backtrader
 
 **This  integration is still under development and may have some issues, use it for live trading at your own risk!**
 
@@ -14,7 +14,7 @@ Support for Oanda-V20 API in backtrader
 
 **backtrader-oandav20** is a package to integrate OANDA into [backtrader](https://www.backtrader.com/).
 It uses the [v20](http://developer.oanda.com/rest-live-v20/introduction/) API of OANDA. It can be used with demo or live account.
-We highly recommend to have a specific account to use backtrader with OANDA. You should not trade manually on the same account if you wish to use backtrader. 
+We highly recommend to have a specific account to use backtrader with OANDA. You should not trade manually on the same account if you wish to use backtrader.
 
 
 It includes all necessary utilities to backtest or do live trading:
@@ -22,14 +22,14 @@ It includes all necessary utilities to backtest or do live trading:
 * Store
 * Broker
 * Data Feeds
-* Sizers 
+* Sizers
 
 Available features:
 
 * Accessing oandav20 API
-* Streamming prices
-* Streamming events
-* Get history price for backtesting
+* Streaming prices
+* Streaming events
+* Get *unlimited* history prices for backtesting
 * Replay functionality for backtesting
 * Support different type of orders:
   * Order.market
@@ -42,16 +42,16 @@ Available features:
   * OandaV20Percent - returns position size which matches the percent amount of total cash
   * OandaV20Cash - return position size which matches the cash amount
   * OandaV20RiskPercent - returns position size which matches the total risk in percent of total amount (max stop loss)
-  * OandaV20RiskCash - returns position size which matches the total risk in percent of total amount (max stop loss) 
-* Possibility to load existing positions from the OANDA account  
+  * OandaV20RiskCash - returns position size which matches the total risk in percent of total amount (max stop loss)
+* Possibility to load existing positions from the OANDA account
 
 
 
 ## Required dependencies
 
-* python 3.6 
+* python 3.6
 * ``Backtrader`` (tested with version 1.9.61.122)
-* ``pyyaml`` (tested with version 3.13) 
+* ``pyyaml`` (tested with version 3.13)
 * ``v20`` (tested with version 3.0.25) (https://github.com/oanda/v20-python/releases)
 
 
