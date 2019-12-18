@@ -62,26 +62,24 @@ No package is available at the moment so you need to install it manually.
 The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 
 1. Install backtrader ``pip install backtrader[plotting]`` (https://www.backtrader.com/docu/installation.html)
-2. Download a zip file of the master branch
-3. Extract the zip files
-4. Copy the btoandav20 into your own working directory
-5. Install dependencies:
+2. Install backtrader-oandav20 ``pip install https://github.com/ftomassetti/backtrader-oandav20``
+3. Install dependencies:
     * ``pip install pyyaml``
     * ``pip install v20``
-6. Import ``btoandav20`` into your script: ``import btoandav20`` (this is considering your script is at the root of your folder)
-7. You can then access the different such as :
-    * Store: ``btoandav20.stores.OandaV20Store`` 
-    * Data Feed: ``btoandav20.feeds.OandaV20Data`` 
+4. Import ``btoandav20`` into your script: ``import btoandav20`` (this is considering your script is at the root of your folder)
+5. You can then access the different such as :
+    * Store: ``btoandav20.stores.OandaV20Store``
+    * Data Feed: ``btoandav20.feeds.OandaV20Data``
     * Broker:  ``btoandav20.brokers.OandaV20Broker``
     * Sizers: ``btoandav20.sizers.OandaV20Cash`` (other sizers are available)
 
-If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/13 and create a new issue if this doesn't solve it.  
+If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/13 and create a new issue if this doesn't solve it.
 
 
 
-## Get Started  
-See the [example](examples/oandav20test) folder for more detailed explanation on how to use it. 
- 
+## Get Started
+See the [example](examples/oandav20test) folder for more detailed explanation on how to use it.
+
 
 
 ## License
