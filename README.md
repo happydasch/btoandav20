@@ -17,14 +17,14 @@ It uses the [v20](http://developer.oanda.com/rest-live-v20/introduction/) API of
 We highly recommend to have a specific account to use backtrader with OANDA. You should not trade manually on the same account if you wish to use backtrader.
 
 
-It includes all necessary utilities to backtest or do live trading:
+**It includes all necessary utilities to backtest or do live trading:**
 
 * Store
 * Broker
 * Data Feeds
 * Sizers
 
-Available features:
+**Available features:**
 
 * Accessing oandav20 API
 * Streaming prices
@@ -47,7 +47,7 @@ Available features:
 
 
 
-## Required dependencies
+## Dependencies
 
 * python 3.6
 * ``Backtrader`` (tested with version 1.9.61.122)
@@ -62,15 +62,15 @@ The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 
 1. Install backtrader ``pip install backtrader[plotting]`` (https://www.backtrader.com/docu/installation.html)
 2. Install backtrader-oandav20 ``pip install git+https://github.com/ftomassetti/backtrader-oandav20``
-3. Install dependencies:
-    * ``pip install pyyaml``
-    * ``pip install v20``
-4. Import ``btoandav20`` into your script: ``import btoandav20`` (this is considering your script is at the root of your folder)
-5. You can then access the different such as :
-    * Store: ``btoandav20.stores.OandaV20Store``
-    * Data Feed: ``btoandav20.feeds.OandaV20Data``
-    * Broker:  ``btoandav20.brokers.OandaV20Broker``
-    * Sizers: ``btoandav20.sizers.OandaV20Cash`` (other sizers are available)
+3. Import ``btoandav20`` into your script: ``import btoandav20`` (this is considering your script is at the root of your folder)
+
+
+**You can then access the different parts such as:**
+
+* Store: ``btoandav20.stores.OandaV20Store``
+* Data Feed: ``btoandav20.feeds.OandaV20Data``
+* Broker: ``btoandav20.brokers.OandaV20Broker``
+* Sizers: ``btoandav20.sizers.OandaV20Cash`` (other sizers are available)
 
 If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/13 and create a new issue if this doesn't solve it.
 
