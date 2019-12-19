@@ -221,6 +221,8 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             # [main, stopside, takeside], neg idx to array are -3, -2, -1
             if reason == 'STOP_LOSS_ORDER':
                 order = self.brackets[pref][-2]
+            elif reason == 'TRAILING_STOP_LOSS_ORDER':
+                order = self.brackets[pref][-2]
             elif reason == 'TAKE_PROFIT_ORDER':
                 order = self.brackets[pref][-1]
             else:

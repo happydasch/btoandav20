@@ -32,11 +32,11 @@ Available features:
 * Get *unlimited* history prices for backtesting
 * Replay functionality for backtesting
 * Support different type of orders:
-  * Order.market
+  * Order.Market
   * Order.Limit
   * Order.Stop
-  * Order.StopLimit (using Stop and upperBound / lowerBound prices)
-  * Order.StopTrail
+  * Order.StopLimit (using Stop and upperBound / lowerBound prices) *may not be possible*
+  * Order.StopTrail (will only work in buy and sell brackets)
   * Bracket orders are supported by using the takeprofit and stoploss order members and creating internally simulated orders.
 * 4 different Sizers:
   * OandaV20Percent - returns position size which matches the percent amount of total cash

@@ -180,7 +180,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         )
 
     def start(self, data=None, broker=None):
-        # Datas require some processing to kickstart data reception
+        # datas require some processing to kickstart data reception
         if data is None and broker is None:
             self.cash = None
             return
@@ -238,7 +238,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             response = self.oapi.account.instruments(self.p.account,
                                               instruments=dataname)
             inst = response.get('instruments', 200)
-            # convert instrumens to dict
+            # convert instruments to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
         except Exception as e:
@@ -253,7 +253,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             response = self.oapi.account.instruments(self.p.account,
                                              instruments=dataname)
             inst = response.get('instruments', 200)
-            # convert instrumens to dict
+            # convert instruments to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
         except Exception as e:
@@ -365,13 +365,21 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         if order.exectype == bt.Order.StopTrail:
             okwargs['distance'] = order.trailamount
 
-        if stopside is not None and stopside.price is not None:
-            okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails(
-                price = format(stopside.price, '.%df' % order.data.contractdetails['displayPrecision']),
-                clientExtensions = v20.transaction.ClientExtensions(
-                    id = str(stopside.ref)
+        if stopside is not None:
+            if stopside.exectype == bt.Order.StopTrail:
+                okwargs['trailingStopLossOnFill'] = v20.transaction.TrailingStopLossDetails(
+                    distance = stopside.trailamount,
+                    clientExtensions = v20.transaction.ClientExtensions(
+                        id = str(stopside.ref)
+                    ).dict()
                 ).dict()
-            ).dict()
+            else:
+                okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails(
+                    price = format(stopside.price, '.%df' % order.data.contractdetails['displayPrecision']),
+                    clientExtensions = v20.transaction.ClientExtensions(
+                        id = str(stopside.ref)
+                    ).dict()
+                ).dict()
 
         if takeside is not None and takeside.price is not None:
             okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails(
@@ -391,7 +399,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         # notify orders of being submitted
         self.broker._submit(order.ref)
-        if stopside is not None and stopside.price is not None:
+        if stopside is not None: # don't make price on stopside mandatory
             self.broker._submit(stopside.ref)
         if takeside is not None and takeside.price is not None:
             self.broker._submit(takeside.ref)
@@ -535,7 +543,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'LIMIT_ORDER',
                        'STOP_ORDER',
                        'TAKE_PROFIT_ORDER',
-                       'STOP_LOSS_ORDER',]
+                       'STOP_LOSS_ORDER',
+                       'TRAILING_STOP_LOSS_ORDER',]
     # transactions which filled orders
     _X_FILL_TRANS   = ['ORDER_FILL',]
     # transactions which cancelled orders
