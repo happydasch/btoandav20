@@ -61,7 +61,7 @@ Available features:
 The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 
 1. Install backtrader ``pip install backtrader[plotting]`` (https://www.backtrader.com/docu/installation.html)
-2. Install backtrader-oandav20 ``pip install https://github.com/ftomassetti/backtrader-oandav20``
+2. Install backtrader-oandav20 ``pip install git+https://github.com/ftomassetti/backtrader-oandav20``
 3. Install dependencies:
     * ``pip install pyyaml``
     * ``pip install v20``
