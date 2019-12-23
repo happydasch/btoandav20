@@ -3,17 +3,17 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import collections
-import json
 import threading
 import copy
 import time as _time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import v20
 
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+
 
 class SerializableEvent(object):
     '''A threading.Event that can be serialized.'''
@@ -45,6 +45,7 @@ class SerializableEvent(object):
         if d['evt']:
             self.evt.set()
 
+
 class MetaSingleton(MetaParams):
     '''Metaclass to make a metaclassed class a singleton'''
     def __init__(cls, name, bases, dct):
@@ -70,8 +71,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
       - ``practice`` (default: ``False``): use the test environment
 
-      - ``account_poll_freq`` (default: ``10.0``): refresh frequency for account
-        value/cash refresh
+      - ``account_poll_freq`` (default: ``10.0``): refresh frequency for
+        account value/cash refresh
 
      - ``stream_timeout`` (default: ``10``): timeout for stream requests
 
@@ -91,7 +92,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     DataCls = None  # data class will auto register
 
     # Oanda supported granularities
-    '''S5, S10, S15, S30, M1, M2, M3, M4, M5, M10, M15, M30, H1, H2, H3, H4, H6, H8, H12, D, W, M'''
+    '''S5, S10, S15, S30, M1, M2, M3, M4, M5, M10, M15, M30, H1,
+    H2, H3, H4, H6, H8, H12, D, W, M'''
     _GRANULARITIES = {
         (bt.TimeFrame.Seconds, 5): 'S5',
         (bt.TimeFrame.Seconds, 10): 'S10',
@@ -131,7 +133,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     _OAPI_STREAM_URL = ["stream-fxtrade.oanda.com",
                         "stream-fxpractice.oanda.com"]
 
-
     @classmethod
     def getdata(cls, *args, **kwargs):
         '''Returns ``DataCls`` with args, kwargs'''
@@ -148,9 +149,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         self.notifs = collections.deque()  # store notifications for cerebro
 
-        self._cash = 0.0 # margin available, currently available cash
-        self._value = 0.0 # account balance
-        self._currency = None # account currency
+        self._cash = 0.0  # margin available, currently available cash
+        self._value = 0.0  # account balance
+        self._currency = None  # account currency
 
         self.broker = None  # broker instance
         self.datas = list()  # datas that have registered over start
@@ -235,8 +236,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def get_instrument(self, dataname):
         '''Returns details about the requested instrument'''
         try:
-            response = self.oapi.account.instruments(self.p.account,
-                                              instruments=dataname)
+            response = self.oapi.account.instruments(
+                self.p.account,
+                instruments=dataname)
             inst = response.get('instruments', 200)
             # convert instruments to dict
             for idx, val in enumerate(inst):
@@ -250,8 +252,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def get_instruments(self, dataname):
         '''Returns details about available instruments'''
         try:
-            response = self.oapi.account.instruments(self.p.account,
-                                             instruments=dataname)
+            response = self.oapi.account.instruments(
+                self.p.account,
+                instruments=dataname)
             inst = response.get('instruments', 200)
             # convert instruments to dict
             for idx, val in enumerate(inst):
@@ -347,15 +350,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         '''Creates an order'''
         okwargs = dict()
         okwargs['instrument'] = order.data._dataname
-        okwargs['units'] = abs(int(order.created.size)) if order.isbuy() else -abs(int(order.created.size)) # negative for selling
+        okwargs['units'] = (
+            abs(int(order.created.size)) if order.isbuy()
+            else -abs(int(order.created.size)))  # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
 
         if order.exectype != bt.Order.Market:
-            okwargs['price'] = format(order.created.price, '.%df' % order.data.contractdetails['displayPrecision'])
+            okwargs['price'] = format(
+                order.created.price,
+                '.%df' % order.data.contractdetails['displayPrecision'])
             if order.valid is None:
-                okwargs['timeInForce'] = 'GTC' # good to cancel
+                okwargs['timeInForce'] = 'GTC'  # good to cancel
             else:
-                okwargs['timeInForce'] = 'GTD' # good to date
+                okwargs['timeInForce'] = 'GTD'  # good to date
                 gtdtime = order.data.num2date(order.valid)
                 okwargs['gtdTime'] = gtdtime.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
 
@@ -363,35 +370,43 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             okwargs['priceBound'] = order.created.pricelimit
 
         if order.exectype == bt.Order.StopTrail:
-            okwargs['distance'] = order.trailamount
+            okwargs['distance'] = format(
+                order.trailamount,
+                '.%df' % order.data.contractdetails['displayPrecision'])
 
         if stopside is not None:
             if stopside.exectype == bt.Order.StopTrail:
                 okwargs['trailingStopLossOnFill'] = v20.transaction.TrailingStopLossDetails(
-                    distance = stopside.trailamount,
-                    clientExtensions = v20.transaction.ClientExtensions(
-                        id = str(stopside.ref)
+                    distance=format(
+                        stopside.trailamount,
+                        '.%df' % order.data.contractdetails['displayPrecision']),
+                    clientExtensions=v20.transaction.ClientExtensions(
+                        id=str(stopside.ref)
                     ).dict()
                 ).dict()
             else:
                 okwargs['stopLossOnFill'] = v20.transaction.StopLossDetails(
-                    price = format(stopside.price, '.%df' % order.data.contractdetails['displayPrecision']),
-                    clientExtensions = v20.transaction.ClientExtensions(
-                        id = str(stopside.ref)
+                    price=format(
+                        stopside.price,
+                        '.%df' % order.data.contractdetails['displayPrecision']),
+                    clientExtensions=v20.transaction.ClientExtensions(
+                        id=str(stopside.ref)
                     ).dict()
                 ).dict()
 
         if takeside is not None and takeside.price is not None:
             okwargs['takeProfitOnFill'] = v20.transaction.TakeProfitDetails(
-                price = format(takeside.price, '.%df' % order.data.contractdetails['displayPrecision']),
-                clientExtensions = v20.transaction.ClientExtensions(
-                    id = str(takeside.ref)
+                price=format(
+                    takeside.price,
+                    '.%df' % order.data.contractdetails['displayPrecision']),
+                clientExtensions=v20.transaction.ClientExtensions(
+                    id=str(takeside.ref)
                 ).dict()
             ).dict()
 
         # store backtrader order ref in client extensions
         okwargs['clientExtensions'] = v20.transaction.ClientExtensions(
-            id = str(order.ref)
+            id=str(order.ref)
         ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
@@ -399,7 +414,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         # notify orders of being submitted
         self.broker._submit(order.ref)
-        if stopside is not None: # don't make price on stopside mandatory
+        if stopside is not None:  # don't make price on stopside mandatory
             self.broker._submit(stopside.ref)
         if takeside is not None and takeside.price is not None:
             self.broker._submit(takeside.ref)
@@ -416,8 +431,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         '''Returns historical rates'''
         q = queue.Queue()
         kwargs = {'dataname': dataname, 'dtbegin': dtbegin, 'dtend': dtend,
-                   'timeframe': timeframe, 'compression': compression, 'candleFormat': candleFormat,
-                   'includeFirst': includeFirst, 'onlyComplete': onlyComplete, 'q': q}
+                  'timeframe': timeframe, 'compression': compression,
+                  'candleFormat': candleFormat, 'includeFirst': includeFirst,
+                  'onlyComplete': onlyComplete, 'q': q}
         t = threading.Thread(target=self._t_candles, kwargs=kwargs)
         t.daemon = True
         t.start()
@@ -452,8 +468,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 # FIXME not sure, why the type is either Price or ClientPrice
                 # https://github.com/ftomassetti/backtrader-oandav20/issues/26
                 # there was already a suggestion to change this, but both
-                # msg_types return the price. Check for both msg_types (Price, ClientPrice)
-                # to fetch all streamed prices.
+                # msg_types return the price. Check for both msg_types
+                # (Price, ClientPrice) to fetch all streamed prices.
                 if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
                     # put price into queue as dict
                     q.put(msg.dict())
@@ -506,10 +522,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             count += 1
             if count > 1: dtkwargs['includeFirst'] = False
             try:
-                response = self.oapi.instrument.candles(dataname,
-                                                 granularity=granularity,
-                                                 price=candleFormat,
-                                                 **dtkwargs)
+                response = self.oapi.instrument.candles(
+                    dataname,
+                    granularity=granularity,
+                    price=candleFormat,
+                    **dtkwargs)
                 candles = response.get('candles', 200)
             except Exception as e:
                 self.put_notification(e)
@@ -520,7 +537,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for candle in candles:
                 # get current candle time
                 dtobj = datetime.utcfromtimestamp(float(candle.time))
-                # if end time is provided, check if time is reached for every candle
+                # if end time is provided, check if time is reached for
+                # every candle
                 if dtend is not None and dtobj > dtend:
                     break
                 # add candle
@@ -544,17 +562,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'STOP_ORDER',
                        'TAKE_PROFIT_ORDER',
                        'STOP_LOSS_ORDER',
-                       'TRAILING_STOP_LOSS_ORDER',]
+                       'TRAILING_STOP_LOSS_ORDER']
     # transactions which filled orders
-    _X_FILL_TRANS   = ['ORDER_FILL',]
+    _X_FILL_TRANS = ['ORDER_FILL']
     # transactions which cancelled orders
-    _X_CANCEL_TRANS = ['ORDER_CANCEL',]
+    _X_CANCEL_TRANS = ['ORDER_CANCEL']
     # transactions which were rejected
     _X_REJECT_TRANS = ['MARKET_ORDER_REJECT',
                        'LIMIT_ORDER_REJECT',
                        'STOP_ORDER_REJECT',
                        'TAKE_PROFIT_ORDER_REJECT',
-                       'STOP_LOSS_ORDER_REJECT',]
+                       'STOP_LOSS_ORDER_REJECT',
+                       'TRAILING_STOP_LOSS_ORDER_REJECT']
     # transactions which can be ignored
     _X_IGNORE_TRANS = ['DAILY_FINANCING',
                        'CLIENT_CONFIGURE']
@@ -621,7 +640,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _process_transaction(self, oid, trans):
         try:
-            # get a reference to a backtrader order based on the order id / trade id
+            # get a reference to a backtrader order based on
+            # the order id / trade id
             oref = self._orders[oid]
         except KeyError:
             return
@@ -648,7 +668,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.broker._cancel(oref)
 
         elif ttype in self._X_REJECT_TRANS:
-                self.broker._reject(oref)
+            self.broker._reject(oref)
 
     def _t_order_create(self):
         while True:
@@ -658,11 +678,15 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             oref, okwargs = msg
             try:
-                response = self.oapi.order.create(self.p.account, order=okwargs)
+                response = self.oapi.order.create(
+                    self.p.account,
+                    order=okwargs)
                 # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
             except Exception as e:
-                self.put_notification(e)
+                self.put_notification("{}: {}".format(
+                    e,
+                    response.get("errorMessage")))
                 self.broker._reject(oref)
                 continue
 
@@ -679,7 +703,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 # TODO either close pending orders or filled trades
                 response = self.oapi.trade.close(self.p.account, oid)
             except Exception as e:
-                self.put_notification(e)
+                self.put_notification("{}: {}".format(
+                    e,
+                    response.get("errorMessage")))
                 continue
 
             self.broker._cancel(oref)

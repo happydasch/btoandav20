@@ -3,21 +3,14 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import collections
-from copy import copy
-from datetime import date, datetime, timedelta
-import threading
 
-from backtrader.feed import DataBase
-from backtrader import (TimeFrame, num2date, date2num, BrokerBase,
-                        Order, BuyOrder, SellOrder, OrderBase, OrderData)
-from backtrader.utils.py3 import bytes, with_metaclass, MAXFLOAT
-from backtrader.metabase import MetaParams
+from backtrader import BrokerBase, Order, BuyOrder, SellOrder
+from backtrader.utils.py3 import with_metaclass
 from backtrader.comminfo import CommInfoBase
 from backtrader.position import Position
-from backtrader.utils import AutoDict, AutoOrderedDict
-from backtrader.comminfo import CommInfoBase
 
 from ..stores import oandav20store
+
 
 class OandaV20CommInfo(CommInfoBase):
     def getvaluesize(self, size, price):
@@ -31,11 +24,11 @@ class OandaV20CommInfo(CommInfoBase):
 
 
 class MetaOandaV20Broker(BrokerBase.__class__):
-    def __init__(cls, name, bases, dct):
+    def __init__(self, name, bases, dct):
         '''Class has already been created ... register'''
         # Initialize the class
-        super(MetaOandaV20Broker, cls).__init__(name, bases, dct)
-        oandav20store.OandaV20Store.BrokerCls = cls
+        super(MetaOandaV20Broker, self).__init__(name, bases, dct)
+        oandav20store.OandaV20Store.BrokerCls = self
 
 
 class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
@@ -69,11 +62,15 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         self.startingcash = self.cash = 0.0
         self.startingvalue = self.value = 0.0
         self.positions = collections.defaultdict(Position)
-        self.addcommissioninfo(self, OandaV20CommInfo(mult=1.0, stocklike=False))
+        self.addcommissioninfo(self, OandaV20CommInfo(
+            mult=1.0,
+            stocklike=False))
 
     def start(self):
         super(OandaV20Broker, self).start()
-        self.addcommissioninfo(self, OandaV20CommInfo(mult=1.0, stocklike=False))
+        self.addcommissioninfo(self, OandaV20CommInfo(
+            mult=1.0,
+            stocklike=False))
         self.o.start(broker=self)
         self.startingcash = self.cash = cash = self.o.get_cash()
         self.startingvalue = self.value = self.o.get_value()
@@ -82,7 +79,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             for p in self.o.get_positions():
                 print('position for instrument:', p['instrument'])
                 size = float(p['long']['units']) + float(p['short']['units'])
-                price = float(p['long']['averagePrice']) if size > 0 else float(p['short']['averagePrice'])
+                price = (
+                    float(p['long']['averagePrice']) if size > 0
+                    else float(p['short']['averagePrice']))
                 self.positions[p['instrument']] = Position(size, price)
 
     def data_started(self, data):

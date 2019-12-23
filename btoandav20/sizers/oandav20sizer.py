@@ -5,6 +5,7 @@ from __future__ import (absolute_import, division, print_function,
 import backtrader as bt
 from btoandav20.stores import oandav20store
 
+
 class OandaV20Sizer(bt.Sizer):
 
     params = (
@@ -28,13 +29,14 @@ class OandaV20Sizer(bt.Sizer):
                 avail = float(price['unitsAvailable']['default']['long'])
             else:
                 avail = float(price['unitsAvailable']['default']['short'])
-        if self.p.percents is not 0:
+        if self.p.percents != 0:
             size = avail * (self.p.percents / 100)
-        elif self.p.amount is not 0:
+        elif self.p.amount != 0:
             size = (avail / cash) * self.p.amount
         else:
             size = 0
         return int(size)
+
 
 class OandaV20Percent(OandaV20Sizer):
 
@@ -42,11 +44,13 @@ class OandaV20Percent(OandaV20Sizer):
         ('percents', 5),
     )
 
+
 class OandaV20Cash(OandaV20Sizer):
 
     params = (
         ('amount', 50),
     )
+
 
 class OandaV20Risk(OandaV20Sizer):
 
@@ -69,9 +73,9 @@ class OandaV20Risk(OandaV20Sizer):
         sym_src = self.o.get_currency()
 
         cash_to_use = 0
-        if self.p.risk_percents is not 0:
+        if self.p.risk_percents != 0:
             cash_to_use = cash * (self.p.risk_percents / 100)
-        elif self.p.risk_amount is not 0:
+        elif self.p.risk_amount != 0:
             cash_to_use = self.p.risk_amount
 
         if sym_src != sym_to:
@@ -84,19 +88,27 @@ class OandaV20Risk(OandaV20Sizer):
         price_per_pip = cash_to_use / self.p.stoploss
         price = self.o.get_pricing(name)
         if price is not None:
-            size = price_per_pip * (1 / 10 ** data.contractdetails['pipLocation'])
+            size = (
+                price_per_pip
+                * (1 / 10 ** data.contractdetails['pipLocation']))
             if isbuy:
-                size = min(size, float(price['unitsAvailable']['default']['long']))
+                size = min(
+                    size,
+                    float(price['unitsAvailable']['default']['long']))
             else:
-                size = min(size, float(price['unitsAvailable']['default']['short']))
+                size = min(
+                    size,
+                    float(price['unitsAvailable']['default']['short']))
 
         return int(size)
+
 
 class OandaV20RiskPercent(OandaV20Sizer):
 
     params = (
         ('risk_percents', 5),
     )
+
 
 class OandaV20RiskCash(OandaV20Sizer):
 

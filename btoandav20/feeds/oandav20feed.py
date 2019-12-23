@@ -9,20 +9,19 @@ import threading
 
 from backtrader.feed import DataBase
 from backtrader import TimeFrame, date2num, num2date
-from backtrader.utils.py3 import (integer_types, queue, string_types,
-                                  with_metaclass)
-from backtrader.metabase import MetaParams
+from backtrader.utils.py3 import queue, with_metaclass
 
 from ..stores import oandav20store
 
+
 class MetaOandaV20Data(DataBase.__class__):
-    def __init__(cls, name, bases, dct):
+    def __init__(self, name, bases, dct):
         '''Class has already been created ... register'''
         # Initialize the class
-        super(MetaOandaV20Data, cls).__init__(name, bases, dct)
+        super(MetaOandaV20Data, self).__init__(name, bases, dct)
 
         # Register with the store
-        oandav20store.OandaV20Store.DataCls = cls
+        oandav20store.OandaV20Store.DataCls = self
 
 
 class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
@@ -90,8 +89,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
       - ``candles`` (default: ``False``)
 
-        Return candles instead of streaming for current data, granularity needs to be
-        higher than Ticks
+        Return candles instead of streaming for current data, granularity
+        needs to be higher than Ticks
 
 
     This data feed supports only this mapping of ``timeframe`` and
@@ -229,7 +228,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         if instart:
             if not self.p.candles:
                 self._reconns = self.p.reconnections
-                self.qlive = self.o.streaming_prices(self.p.dataname, tmout=tmout)
+                self.qlive = self.o.streaming_prices(
+                    self.p.dataname,
+                    tmout=tmout)
             else:
                 self.poll_thread()
         self._state = self._ST_LIVE
@@ -241,7 +242,10 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         t.start()
 
     def _t_poll(self):
-        dtstart = self._getstarttime(self._timeframe, self._compression, offset=1)
+        dtstart = self._getstarttime(
+            self._timeframe,
+            self._compression,
+            offset=1)
         while True:
             dtcurr = self._getstarttime(self._timeframe, self._compression)
             # request candles in live instead of stream
@@ -262,20 +266,27 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 dtstart = dtbegin
                 # sleep until next call
                 dtnow = datetime.utcnow()
-                dtnext = self._getstarttime(self._timeframe, self._compression, dt=dtnow, offset=-1)
+                dtnext = self._getstarttime(
+                    self._timeframe,
+                    self._compression,
+                    dt=dtnow,
+                    offset=-1)
                 dtdiff = dtnext - dtnow
-                tmout = (dtdiff.days*24*60*60) + dtdiff.seconds + 1
-                if tmout <= 0: tmout = 5
+                tmout = (dtdiff.days * 24 * 60 * 60) + dtdiff.seconds + 1
+                if tmout <= 0:
+                    tmout = 5
                 _time.sleep(tmout)
 
-    def _getstarttime(self, timeframe, compression, dt = None, offset = 0):
+    def _getstarttime(self, timeframe, compression, dt=None, offset=0):
         '''This method will return the start of the period based on current
         time (or provided time). It is using UTC 22:00 (5:00 pm New York)
         as the start of the day.'''
-        if dt == None:
+        if dt is None:
             dt = datetime.utcnow()
         if timeframe == TimeFrame.Seconds:
-            dt = dt.replace(second=(dt.second//compression)*compression, microsecond=0)
+            dt = dt.replace(
+                second=(dt.second // compression) * compression,
+                microsecond=0)
             if offset:
                 dt = dt - timedelta(seconds=compression*offset)
         elif timeframe == TimeFrame.Minutes:
@@ -284,13 +295,17 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 minutes = 0
                 # get start of day
                 dtstart = self._getstarttime(TimeFrame.Days, 1, dt)
-                #diff start of day with current time to get seconds since start of day
+                # diff start of day with current time to get seconds
+                # since start of day
                 dtdiff = dt - dtstart
                 hours = dtdiff.seconds//((60*60)*(compression//60))
                 minutes = compression % 60
                 dt = dtstart + timedelta(hours=hours, minutes=minutes)
             else:
-                dt = dt.replace(minute=(dt.minute//compression)*compression, second=0, microsecond=0)
+                dt = dt.replace(
+                    minute=(dt.minute // compression) * compression,
+                    second=0,
+                    microsecond=0)
             if offset:
                 dt = dt - timedelta(minutes=compression*offset)
         elif timeframe == TimeFrame.Days:
@@ -309,10 +324,11 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
         elif timeframe == TimeFrame.Months:
             if offset:
-                dt= dt - timedelta(days=(min(28+dt.day, 31)))
+                dt = dt - timedelta(days=(min(28 + dt.day, 31)))
             # last day of month
             last_day_of_month = dt.replace(day=28) + timedelta(days=4)
-            last_day_of_month = last_day_of_month - timedelta(days=last_day_of_month.day)
+            last_day_of_month = last_day_of_month - timedelta(
+                days=last_day_of_month.day)
             last_day_of_month = last_day_of_month.day
             # start of month (1 at 0, 22 last day of prev month)
             if dt.day < last_day_of_month:
@@ -330,10 +346,11 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         # they will be overriden when calling replay
         orig_timeframe = self._timeframe
         orig_compression = self._compression
-        #setting up replay configuration
+        # setting up replay configuration
         super(DataBase, self).replay(**kwargs)
-        #putting back original timeframe and compression to fetch correct data
-        #the replay configuration will still use the correct dataframe and compression for strategy
+        # putting back original timeframe and compression to fetch correct data
+        # the replay configuration will still use the correct dataframe and
+        # compression for strategy
         self._timeframe = orig_timeframe
         self._compression = orig_compression
 
@@ -493,7 +510,16 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         self.lines.openinterest[0] = 0.0
 
         # Put the prices into the bar
-        tick = float(msg['asks'][0]['price']) if self.p.useask else float(msg['bids'][0]['price'])
+        if self.p.bidask:
+            if self.p.useask:
+                tick = float(msg['asks'][0]['price'])
+            else:
+                tick = float(msg['bids'][0]['price'])
+        else:
+            # create mid price
+            tick = (
+                float(msg['bids'][0]['price'])
+                + float(msg['asks'][0]['price'])) / 2
         self.lines.open[0] = tick
         self.lines.high[0] = tick
         self.lines.low[0] = tick
