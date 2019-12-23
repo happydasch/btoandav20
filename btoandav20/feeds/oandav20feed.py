@@ -60,8 +60,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
         An additional data source can be passed to do an initial layer of
         backfilling. Once the data source is depleted and if requested,
-        backfilling from IB will take place. This is ideally meant to backfill
-        from already stored sources like a file on disk, but not limited to.
+        backfilling from oanda will take place. This is ideally meant to 
+        backfill from already stored sources like a file on disk, but not 
+        limited to.
 
       - ``bidask`` (default: ``True``)
 

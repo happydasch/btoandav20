@@ -127,6 +127,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.StopLimit: 'STOP',
     }
 
+    # Date format used
+    _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000000000Z"
+
     # Oanda api endpoints
     _OAPI_URL = ["api-fxtrade.oanda.com",
                  "api-fxpractice.oanda.com"]
@@ -364,7 +367,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             else:
                 okwargs['timeInForce'] = 'GTD'  # good to date
                 gtdtime = order.data.num2date(order.valid)
-                okwargs['gtdTime'] = gtdtime.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+                okwargs['gtdTime'] = gtdtime.strftime(self._DATE_FORMAT)
 
         if order.exectype == bt.Order.StopLimit:
             okwargs['priceBound'] = order.created.pricelimit
@@ -514,7 +517,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         dtkwargs = {}
         if dtbegin is not None:
-            dtkwargs['fromTime'] = dtbegin.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+            dtkwargs['fromTime'] = dtbegin.strftime(self._DATE_FORMAT)
             dtkwargs['includeFirst'] = includeFirst
 
         count = 0
@@ -546,7 +549,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     q.put(candle.dict())
 
             if dtobj is not None:
-                dtkwargs['fromTime'] = dtobj.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+                dtkwargs['fromTime'] = dtobj.strftime(self._DATE_FORMAT)
             elif dtobj is None:
                 break
             if dtend is not None and dtobj > dtend:
