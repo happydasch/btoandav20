@@ -72,7 +72,7 @@ The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 * Broker: ``btoandav20.brokers.OandaV20Broker``
 * Sizers: ``btoandav20.sizers.OandaV20Cash`` (other sizers are available)
 
-If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/13 and create a new issue if this doesn't solve it.
+If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/ and create a new issue if this doesn't solve it.
 
 
 
