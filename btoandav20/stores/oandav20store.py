@@ -699,12 +699,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             if oref is None:
                 break
 
-            oid = self._orders.get(oref, None)
+            oid = None
+            for key, value in self._orders.items():
+                if value == oref:
+                    oid = key
+                    break
+            
             if oid is None:
                 continue  # the order is no longer there
             try:
                 # TODO either close pending orders or filled trades
-                response = self.oapi.trade.close(self.p.account, oid)
+                response = self.oapi.order.cancel(self.p.account, oid)
             except Exception as e:
                 self.put_notification("{}: {}".format(
                     e,
