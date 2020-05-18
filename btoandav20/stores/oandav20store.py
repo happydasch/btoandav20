@@ -373,15 +373,21 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             okwargs['priceBound'] = order.created.pricelimit
 
         if order.exectype == bt.Order.StopTrail:
+            trailamount = order.trailamount
+            if order.trailpercent:
+                trailamount = (order.price / 100) * order.trailpercent
             okwargs['distance'] = format(
-                order.trailamount,
+                trailamount,
                 '.%df' % order.data.contractdetails['displayPrecision'])
 
         if stopside is not None:
             if stopside.exectype == bt.Order.StopTrail:
+                trailamount = stopside.trailamount
+                if stopside.trailpercent:
+                    trailamount = (order.price / 100) * stopside.trailpercent
                 okwargs['trailingStopLossOnFill'] = v20.transaction.TrailingStopLossDetails(
                     distance=format(
-                        stopside.trailamount,
+                        trailamount,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
                         id=str(stopside.ref)
@@ -704,7 +710,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 if value == oref:
                     oid = key
                     break
-            
+
             if oid is None:
                 continue  # the order is no longer there
             try:
