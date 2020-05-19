@@ -375,7 +375,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         if order.exectype == bt.Order.StopTrail:
             trailamount = order.trailamount
             if order.trailpercent:
-                trailamount = (order.price / 100) * order.trailpercent
+                trailamount = order.price * order.trailpercent
             okwargs['distance'] = format(
                 trailamount,
                 '.%df' % order.data.contractdetails['displayPrecision'])
@@ -384,7 +384,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             if stopside.exectype == bt.Order.StopTrail:
                 trailamount = stopside.trailamount
                 if stopside.trailpercent:
-                    trailamount = (order.price / 100) * stopside.trailpercent
+                    trailamount = order.price * stopside.trailpercent
                 okwargs['trailingStopLossOnFill'] = v20.transaction.TrailingStopLossDetails(
                     distance=format(
                         trailamount,
