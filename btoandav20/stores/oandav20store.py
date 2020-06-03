@@ -225,14 +225,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert positions to dict
             for idx, val in enumerate(pos):
                 pos[idx] = val.dict()
+        except v20.V20Timeout as e:
+            self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
                         e,
                         response))
-            return None
 
-        return pos
+        try:
+            return pos
+        except NameError:
+            return None
 
     def get_granularity(self, timeframe, compression):
         '''Returns the granularity useable for oanda'''
@@ -248,14 +252,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert instruments to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
+        except v20.V20Timeout as e:
+                self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
                         e,
                         response))
-            return None
 
-        return inst[0] or None
+        try:
+            return inst[0]
+        except NameError:
+            return None
 
     def get_instruments(self, dataname):
         '''Returns details about available instruments'''
@@ -267,14 +275,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert instruments to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
+        except v20.V20Timeout as e:
+            self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
                         e,
                         response))
-            return None
 
-        return inst or None
+        try:
+            return inst
+        except NameError:
+            return None
 
     def get_pricing(self, dataname):
         '''Returns details about current price'''
@@ -285,14 +297,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert prices to dict
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
+        except v20.V20Timeout as e:
+            self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
                         e,
                         response))
-            return None
 
-        return prices[0] or None
+        try:
+            return prices[0]
+        except NameError:
+            return None
 
     def get_pricings(self, dataname):
         '''Returns details about current prices'''
@@ -303,14 +319,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert prices to dict
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
+        except v20.V20Timeout as e:
+            self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
                         e,
                         response))
-            return None
 
-        return prices or None
+        try:
+            return prices
+        except NameError:
+            return None
 
     def get_cash(self):
         '''Returns the available cash'''
@@ -474,6 +494,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for msg_type, msg in response.parts():
                 if msg_type == "transaction.Transaction":
                     self._transaction(msg.dict())
+        except v20.V20Timeout as e:
+            self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -499,6 +521,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
                     # put price into queue as dict
                     q.put(msg.dict())
+        except v20.V20Timeout as e:
+            self.put_notification(e)
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -559,6 +583,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     price=candleFormat,
                     **dtkwargs)
                 candles = response.get('candles', 200)
+            except v20.V20Timeout as e:
+                return
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
@@ -716,6 +742,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     order=okwargs)
                 # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
+            except v20.V20Timeout as e:
+                self.put_notification(e)
+                continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
@@ -741,6 +770,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             try:
                 # TODO either close pending orders or filled trades
                 response = self.oapi.order.cancel(self.p.account, oid)
+            except v20.V20Timeout as e:
+                self.put_notification(e)
+                continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
