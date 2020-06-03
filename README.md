@@ -44,6 +44,7 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
   * OandaV20RiskPercent - returns position size which matches the total risk in percent of total amount (max stop loss)
   * OandaV20RiskCash - returns position size which matches the total risk in percent of total amount (max stop loss)
 * Possibility to load existing positions from the OANDA account
+* Reconnects on broken connections and after timeouts
 
 
 
