@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import time as _time
 import threading
@@ -75,6 +75,14 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         If ``True`` the *ask* part of the *bidask* prices will be used instead
         of the default use of *bid*
 
+      - ``reconnect`` (default: ``True``)
+
+        Reconnect when network connection is down
+
+      - ``reconnections`` (default: ``-1``)
+
+        Number of times to attempt reconnections: ``-1`` means forever
+
       - ``candles`` (default: ``False``)
 
         Return candles instead of streaming for current data, granularity
@@ -118,6 +126,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         ('bidask', True),
         ('useask', False),
         ('candles', False),
+        ('reconnect', True),
+        ('reconnections', -1),  # forever
     )
 
     _store = oandav20store.OandaV20Store
@@ -153,6 +163,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         self._storedmsg = dict()  # keep pending live message (under None)
         self.qlive = queue.Queue()
         self._state = self._ST_OVER
+        self._reconns = self.p.reconnections
         self.contractdetails = None
 
         # Kickstart store and get queue to wait on
@@ -181,6 +192,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             self._state = self._ST_START  # initial state for _load
             self._st_start()
 
+        self._reconns = 0
+
     def _st_start(self, instart=True):
         if self.p.historical:
             self.put_notification(self.DELAYED)
@@ -208,12 +221,13 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             self._statelivereconn = self.p.backfill
         if self._statelivereconn:
             self.put_notification(self.DELAYED)
-        if instart:
-            if not self.p.candles:
-                self.qlive = self.o.streaming_prices(
-                    self.p.dataname)
-            else:
-                self.poll_thread()
+        if not self.p.candles:
+            # every time here we create a a new stream
+            self.qlive = self.o.streaming_prices(
+                self.p.dataname)
+        elif not instart:
+            # poll thread will never die
+            self.poll_thread()
         self._state = self._ST_LIVE
         return True  # no return before - implicit continue
 
@@ -348,8 +362,23 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     msg = (self._storedmsg.pop(None, None) or
                            self.qlive.get(timeout=self._qcheck))
                 except queue.Empty:
-                    ''' TODO on reconnection, set data to a different state, when data is available fetch missing data before setting to live '''
-                    return  # indicate timeout situation
+                    return None
+
+                if 'msg' in msg:
+                    self.put_notification(self.CONNBROKEN)
+
+                    if not self.p.reconnect or self._reconns == 0:
+                        # Can no longer reconnect
+                        self.put_notification(self.DISCONNECTED)
+                        self._state = self._ST_OVER
+                        return False  # failed
+
+                    # Can reconnect
+                    self._reconns -= 1
+                    self._st_start(instart=False)
+                    continue
+
+                self._reconns = self.p.reconnections
 
                 # Process the message according to expected return type
                 if not self._statelivereconn:
@@ -377,7 +406,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 dtend = None
                 if len(self) > 1:
                     # len == 1 ... forwarded for the 1st time
-                    dtbegin = self.datetime.datetime(-1)
+                    dtbegin = self.datetime.datetime(-1).astimezone(timezone.utc)
                 elif self.fromdate > float('-inf'):
                     dtbegin = num2date(self.fromdate)
                 else:  # 1st bar and no begin set
@@ -398,23 +427,24 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
             elif self._state == self._ST_HISTORBACK:
                 msg = self.qhist.get()
-                if msg is None:  # Conn broken during historical/backfilling
-                    # Situation not managed. Simply bail out
-                    self.put_notification(self.DISCONNECTED)
-                    self._state = self._ST_OVER
-                    return False  # error management cancelled the queue
+                if msg is None:
+                    continue
 
-                elif 'code' in msg:  # Error
-                    self.put_notification(self.NOTSUBSCRIBED)
-                    self.put_notification(self.DISCONNECTED)
-                    self._state = self._ST_OVER
-                    return False
+                elif 'msg' in msg:  # Error
+                    if not self.p.reconnect or self._reconns == 0:
+                        # Can no longer reconnect
+                        self.put_notification(self.DISCONNECTED)
+                        self._state = self._ST_OVER
+                        return False  # failed
+
+                    # Can reconnect
+                    self._reconns -= 1
+                    self._st_start(instart=False)
+                    continue
 
                 if msg:
-                    if self._load_candle(msg):
-                        return True  # loading worked
-
-                    continue  # not loaded ... date may have been seen
+                    if not self._load_candle(msg):
+                        continue
                 else:
                     # End of histdata
                     if self.p.historical:  # only historical

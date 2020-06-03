@@ -81,7 +81,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
          connection errors
 
      - ``reconntimeout`` (default: ``5.0``): how long to wait to reconnect
-         stream (feeds have
+         stream (feeds have own reconnection settings)
     '''
 
     params = (
@@ -562,44 +562,30 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _t_streaming_prices(self, dataname, q):
         '''Callback method for streaming prices'''
-        reconnections = 0
-        while True:
-            try:
-                response = self.oapi_stream.pricing.stream(
-                    self.p.account,
-                    instruments=dataname,
-                )
-                # reset reconnections after successfully connected
-                reconnections = 0
-                # process response
-                for msg_type, msg in response.parts():
-                    # FIXME not sure, why the type is either Price or ClientPrice
-                    # https://github.com/ftomassetti/backtrader-oandav20/issues/26
-                    # there was already a suggestion to change this, but both
-                    # msg_types return the price. Check for both msg_types
-                    # (Price, ClientPrice) to fetch all streamed prices.
-                    if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
-                        # put price into queue as dict
-                        q.put(msg.dict())
-            except (v20.V20ConnectionError, v20.V20Timeout) as e:
-                self.put_notification(str(e))
-                if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
-                    # unable to reconnect after x times
-                    self.put_notification("Giving up reconnecting streaming prices")
-                    return
-                reconnections += 1
-                if self.p.reconntimeout is not None:
-                    _time.sleep(self.p.reconntimeout)
-                self.put_notification("Trying to reconnect streaming prices ({} of {})".format(
-                    reconnections,
-                    self.p.reconnections))
-                continue
-            except Exception as e:
-                self.put_notification(
-                        self._create_error_notif(
-                            e,
-                            response))
-                return
+        try:
+            response = self.oapi_stream.pricing.stream(
+                self.p.account,
+                instruments=dataname,
+            )
+            # process response
+            for msg_type, msg in response.parts():
+                # FIXME not sure, why the type is either Price or ClientPrice
+                # https://github.com/ftomassetti/backtrader-oandav20/issues/26
+                # there was already a suggestion to change this, but both
+                # msg_types return the price. Check for both msg_types
+                # (Price, ClientPrice) to fetch all streamed prices.
+                if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
+                    # put price into queue as dict
+                    q.put(msg.dict())
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
+            # notify feed of error
+            q.put({"msg": "CONNECTION_ISSUE"})
+        except Exception as e:
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, onlyComplete, q):
@@ -617,7 +603,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         count = 0
         reconnections = 0
         while True:
-            count += 1
             if count > 1: dtkwargs['includeFirst'] = False
             try:
                 response = self.oapi.instrument.candles(
@@ -627,6 +612,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     **dtkwargs)
                 candles = response.get('candles', 200)
                 reconnections = 0
+                count += 1
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
                 if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
@@ -644,7 +630,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     self._create_error_notif(
                         e,
                         response))
-                return
+                continue
 
             dtobj = None
             for candle in candles:
