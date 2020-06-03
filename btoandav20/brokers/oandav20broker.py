@@ -9,7 +9,7 @@ from backtrader.utils.py3 import with_metaclass
 from backtrader.position import Position
 
 from ..stores import oandav20store
-from ..commisions import oandav20comm
+from ..commissions import oandav20comm
 
 class MetaOandaV20Broker(BrokerBase.__class__):
     def __init__(self, name, bases, dct):

@@ -6,7 +6,7 @@ class OandaV20CommInfo(CommInfoBase):
         ('stocklike', False),
         ('pip_location', -4),
         ('acc_counter_currency', True),
-        ('commtype', bt.CommInfoBase.COMM_FIXED),
+        ('commtype', CommInfoBase.COMM_FIXED),
         )
 
     def getvaluesize(self, size, price):
