@@ -250,9 +250,15 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
                 # Put parent in orders dict, but add stopside and takeside
                 # to order creation. Return the takeside order, to have 3s
                 takeside = order  # alias for clarity
-                parent, stopside = self.opending.pop(pref)
+                # ensure at least parent is available
+                if len(self.opending) > 1:
+                    parent, stopside = self.opending.pop(pref)
+                else:
+                    parent = self.opending.pop(pref)[0]
+                    stopside = None
                 for o in parent, stopside, takeside:
-                    self.orders[o.ref] = o  # write them down
+                    if o is not None:
+                        self.orders[o.ref] = o  # write them down
 
                 self.brackets[pref] = [parent, stopside, takeside]
                 self.o.order_create(parent, stopside, takeside)
