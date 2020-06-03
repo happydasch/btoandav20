@@ -6,45 +6,10 @@ import collections
 
 from backtrader import BrokerBase, Order, BuyOrder, SellOrder
 from backtrader.utils.py3 import with_metaclass
-from backtrader.comminfo import CommInfoBase
 from backtrader.position import Position
 
 from ..stores import oandav20store
-
-
-class OandaV20CommInfo(CommInfoBase):
-    params = (
-        ('spread', 2.0),
-        ('stocklike', False),
-        ('pip_location', -4),
-        ('acc_counter_currency', True),
-        ('commtype', bt.CommInfoBase.COMM_FIXED),
-        )
-
-    def getvaluesize(self, size, price):
-        # In real life the margin approaches the price
-        return abs(size) * price
-
-    def getoperationcost(self, size, price):
-        '''Returns the needed amount of cash an operation would cost'''
-        # Same reasoning as above
-        return abs(size) * price
-
-    def _getcommission(self, size, price, pseudoexec):
-        '''
-        This scheme will apply half the commission when buying and half when selling.
-        If account currency is same as the base currency, change pip value calc.
-        https://community.backtrader.com/topic/525/forex-commission-scheme
-        '''
-        multiplier = float(10 ** self.p.pip_location)
-
-        if self.p.acc_counter_currency == True:
-            comm = abs((self.p.spread * (size * multiplier)/2))
-        else:
-            comm = abs((self.p.spread * ((size / price) * multiplier)/2))
-
-        return comm
-
+from ..commisions import oandav20comm
 
 class MetaOandaV20Broker(BrokerBase.__class__):
     def __init__(self, name, bases, dct):
@@ -85,15 +50,11 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         self.startingcash = self.cash = 0.0
         self.startingvalue = self.value = 0.0
         self.positions = collections.defaultdict(Position)
-        self.addcommissioninfo(self, OandaV20CommInfo(
-            mult=1.0,
-            stocklike=False))
+        self.addcommissioninfo(self, oandav20comm.OandaV20CommInfo())
 
     def start(self):
         super(OandaV20Broker, self).start()
-        self.addcommissioninfo(self, OandaV20CommInfo(
-            mult=1.0,
-            stocklike=False))
+        self.addcommissioninfo(self, oandav20comm.OandaV20CommInfo())
         self.o.start(broker=self)
         self.startingcash = self.cash = cash = self.o.get_cash()
         self.startingvalue = self.value = self.o.get_value()
