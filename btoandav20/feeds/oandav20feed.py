@@ -75,18 +75,6 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         If ``True`` the *ask* part of the *bidask* prices will be used instead
         of the default use of *bid*
 
-      - ``reconnect`` (default: ``True``)
-
-        Reconnect when network connection is down
-
-      - ``reconnections`` (default: ``-1``)
-
-        Number of times to attempt reconnections: ``-1`` means forever
-
-      - ``reconntimeout`` (default: ``5.0``)
-
-        Time in seconds to wait in between reconnection attemps
-
       - ``candles`` (default: ``False``)
 
         Return candles instead of streaming for current data, granularity
@@ -129,10 +117,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         ('backfill_from', None),  # additional data source to do backfill from
         ('bidask', True),
         ('useask', False),
-        ('reconnect', True),
         ('candles', False),
-        ('reconnections', -1),  # forever
-        ('reconntimeout', 5.0),
     )
 
     _store = oandav20store.OandaV20Store
@@ -196,9 +181,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             self._state = self._ST_START  # initial state for _load
             self._st_start()
 
-        self._reconns = 0
-
-    def _st_start(self, instart=True, tmout=None):
+    def _st_start(self, instart=True):
         if self.p.historical:
             self.put_notification(self.DELAYED)
             dtend = None
@@ -227,10 +210,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             self.put_notification(self.DELAYED)
         if instart:
             if not self.p.candles:
-                self._reconns = self.p.reconnections
                 self.qlive = self.o.streaming_prices(
-                    self.p.dataname,
-                    tmout=tmout)
+                    self.p.dataname)
             else:
                 self.poll_thread()
         self._state = self._ST_LIVE
@@ -367,41 +348,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     msg = (self._storedmsg.pop(None, None) or
                            self.qlive.get(timeout=self._qcheck))
                 except queue.Empty:
-                    return None  # indicate timeout situation
-
-                if msg is None:  # Conn broken during historical/backfilling
-                    self.put_notification(self.CONNBROKEN)
-                    # Try to reconnect
-                    if not self.p.reconnect or self._reconns == 0:
-                        # Can no longer reconnect
-                        self.put_notification(self.DISCONNECTED)
-                        self._state = self._ST_OVER
-                        return False  # failed
-
-                    self._reconns -= 1
-                    self._st_start(instart=False, tmout=self.p.reconntimeout)
-                    continue
-
-                if 'code' in msg:
-                    self.put_notification(self.CONNBROKEN)
-                    code = msg['code']
-                    if code not in [599, 598, 596]:
-                        self.put_notification(self.DISCONNECTED)
-                        self._state = self._ST_OVER
-                        return False  # failed
-
-                    if not self.p.reconnect or self._reconns == 0:
-                        # Can no longer reconnect
-                        self.put_notification(self.DISCONNECTED)
-                        self._state = self._ST_OVER
-                        return False  # failed
-
-                    # Can reconnect
-                    self._reconns -= 1
-                    self._st_start(instart=False, tmout=self.p.reconntimeout)
-                    continue
-
-                self._reconns = self.p.reconnections
+                    ''' TODO on reconnection, set data to a different state, when data is available fetch missing data before setting to live '''
+                    return  # indicate timeout situation
 
                 # Process the message according to expected return type
                 if not self._statelivereconn:

@@ -76,6 +76,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
      - ``stream_timeout`` (default: ``10``): timeout for stream requests
 
      - ``poll_timeout`` (default: ``2``): timeout for poll requests
+
+     - ``reconnections`` (default: ``-1``): try to reconnect forever
+         connection errors
+
+     - ``reconntimeout`` (default: ``5.0``): how long to wait to reconnect
+         stream (feeds have
     '''
 
     params = (
@@ -85,6 +91,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         ('account_poll_freq', 10.0),  # account balance refresh timeout
         ('stream_timeout', 10),
         ('poll_timeout', 2),
+        ('reconnections', -1),
+        ('reconntimeout', 5.0),
     )
 
     BrokerCls = None  # broker class will auto register
@@ -225,8 +233,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert positions to dict
             for idx, val in enumerate(pos):
                 pos[idx] = val.dict()
-        except v20.V20Timeout as e:
-            self.put_notification(e)
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -252,8 +260,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert instruments to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
-        except v20.V20Timeout as e:
-                self.put_notification(e)
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -275,8 +283,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert instruments to dict
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
-        except v20.V20Timeout as e:
-            self.put_notification(e)
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -297,8 +305,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert prices to dict
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
-        except v20.V20Timeout as e:
-            self.put_notification(e)
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -319,8 +327,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert prices to dict
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
-        except v20.V20Timeout as e:
-            self.put_notification(e)
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -365,19 +373,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         # Wait once for the values to be set
         self._evt_acct.wait(self.p.account_poll_freq)
 
-    def streaming_events(self, tmout=None):
+    def streaming_events(self):
         '''Creates threads for event streaming'''
         q = queue.Queue()
-        kwargs = {'q': q, 'tmout': tmout}
+        kwargs = {'q': q}
         t = threading.Thread(target=self._t_streaming_events, kwargs=kwargs)
         t.daemon = True
         t.start()
         return q
 
-    def streaming_prices(self, dataname, tmout=None):
+    def streaming_prices(self, dataname):
         '''Creates threads for price streaming'''
         q = queue.Queue()
-        kwargs = {'q': q, 'dataname': dataname, 'tmout': tmout}
+        kwargs = {'q': q, 'dataname': dataname}
         t = threading.Thread(target=self._t_streaming_prices, kwargs=kwargs)
         t.daemon = True
         t.start()
@@ -482,53 +490,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t.start()
         return q
 
-    def _t_streaming_events(self, q, tmout=None):
-        '''Callback method for streaming events'''
-        if tmout is not None:
-            _time.sleep(tmout)
-
-        try:
-            response = self.oapi_stream.transaction.stream(
-                self.p.account
-            )
-            for msg_type, msg in response.parts():
-                if msg_type == "transaction.Transaction":
-                    self._transaction(msg.dict())
-        except v20.V20Timeout as e:
-            self.put_notification(e)
-        except Exception as e:
-            self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
-
-    def _t_streaming_prices(self, dataname, q, tmout):
-        '''Callback method for streaming prices'''
-        if tmout is not None:
-            _time.sleep(tmout)
-
-        try:
-            response = self.oapi_stream.pricing.stream(
-                self.p.account,
-                instruments=dataname,
-            )
-            for msg_type, msg in response.parts():
-                # FIXME not sure, why the type is either Price or ClientPrice
-                # https://github.com/ftomassetti/backtrader-oandav20/issues/26
-                # there was already a suggestion to change this, but both
-                # msg_types return the price. Check for both msg_types
-                # (Price, ClientPrice) to fetch all streamed prices.
-                if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
-                    # put price into queue as dict
-                    q.put(msg.dict())
-        except v20.V20Timeout as e:
-            self.put_notification(e)
-        except Exception as e:
-            self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
-
     def _t_account(self):
         '''Callback method for account request'''
         while True:
@@ -542,12 +503,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             try:
                 response = self.oapi.account.summary(self.p.account)
                 accinfo = response.get('account', 200)
+            except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
+                if self.p.reconnections == 0:
+                    self.put_notification("Giving up fetching account summary")
+                    return
+                continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
                         e,
                         response))
-                continue
+                return
 
             try:
                 self._cash = accinfo.marginAvailable
@@ -558,6 +525,81 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             # notify of success, initialization waits for it
             self._evt_acct.set()
+
+    def _t_streaming_events(self, q):
+        '''Callback method for streaming events'''
+        reconnections = 0
+        while True:
+            try:
+                response = self.oapi_stream.transaction.stream(
+                    self.p.account
+                )
+                # reset reconnections after successfully connected
+                reconnections = 0
+                # process response
+                for msg_type, msg in response.parts():
+                    if msg_type == "transaction.Transaction":
+                        self._transaction(msg.dict())
+            except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
+                if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
+                    # unable to reconnect after x times
+                    self.put_notification("Giving up reconnecting streaming events")
+                    return
+                reconnections += 1
+                if self.p.reconntimeout is not None:
+                    _time.sleep(self.p.reconntimeout)
+                self.put_notification("Trying to reconnect streaming events ({} of {})".format(
+                    reconnections,
+                    self.p.reconnections))
+                continue
+            except Exception as e:
+                self.put_notification(
+                        self._create_error_notif(
+                            e,
+                            response))
+                return
+
+    def _t_streaming_prices(self, dataname, q):
+        '''Callback method for streaming prices'''
+        reconnections = 0
+        while True:
+            try:
+                response = self.oapi_stream.pricing.stream(
+                    self.p.account,
+                    instruments=dataname,
+                )
+                # reset reconnections after successfully connected
+                reconnections = 0
+                # process response
+                for msg_type, msg in response.parts():
+                    # FIXME not sure, why the type is either Price or ClientPrice
+                    # https://github.com/ftomassetti/backtrader-oandav20/issues/26
+                    # there was already a suggestion to change this, but both
+                    # msg_types return the price. Check for both msg_types
+                    # (Price, ClientPrice) to fetch all streamed prices.
+                    if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
+                        # put price into queue as dict
+                        q.put(msg.dict())
+            except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
+                if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
+                    # unable to reconnect after x times
+                    self.put_notification("Giving up reconnecting streaming prices")
+                    return
+                reconnections += 1
+                if self.p.reconntimeout is not None:
+                    _time.sleep(self.p.reconntimeout)
+                self.put_notification("Trying to reconnect streaming prices ({} of {})".format(
+                    reconnections,
+                    self.p.reconnections))
+                continue
+            except Exception as e:
+                self.put_notification(
+                        self._create_error_notif(
+                            e,
+                            response))
+                return
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, onlyComplete, q):
@@ -573,6 +615,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             dtkwargs['includeFirst'] = includeFirst
 
         count = 0
+        reconnections = 0
         while True:
             count += 1
             if count > 1: dtkwargs['includeFirst'] = False
@@ -583,8 +626,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     price=candleFormat,
                     **dtkwargs)
                 candles = response.get('candles', 200)
-            except v20.V20Timeout as e:
-                return
+                reconnections = 0
+            except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
+                if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
+                    self.put_notification("Giving up fetching candles")
+                    return
+                reconnections += 1
+                if self.p.reconntimeout is not None:
+                    _time.sleep(self.p.reconntimeout)
+                self.put_notification("Trying to fetch candles ({} of {})".format(
+                    reconnections,
+                    self.p.reconnections))
+                continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
@@ -742,8 +796,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     order=okwargs)
                 # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
-            except v20.V20Timeout as e:
-                self.put_notification(e)
+            except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
+                self.broker._reject(oref)
                 continue
             except Exception as e:
                 self.put_notification(
@@ -770,8 +825,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             try:
                 # TODO either close pending orders or filled trades
                 response = self.oapi.order.cancel(self.p.account, oid)
-            except v20.V20Timeout as e:
-                self.put_notification(e)
+            except (v20.V20ConnectionError, v20.V20Timeout) as e:
+                self.put_notification(str(e))
                 continue
             except Exception as e:
                 self.put_notification(
