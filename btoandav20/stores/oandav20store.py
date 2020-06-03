@@ -227,7 +227,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for idx, val in enumerate(pos):
                 pos[idx] = val.dict()
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
             return None
 
         return pos
@@ -247,7 +250,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
             return None
 
         return inst[0] or None
@@ -263,7 +269,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
             return None
 
         return inst or None
@@ -278,7 +287,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
             return None
 
         return prices[0] or None
@@ -293,7 +305,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for idx, val in enumerate(prices):
                 prices[idx] = val.dict()
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
             return None
 
         return prices or None
@@ -461,7 +476,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 if msg_type == "transaction.Transaction":
                     self._transaction(msg.dict())
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
 
     def _t_streaming_prices(self, dataname, q, tmout):
         '''Callback method for streaming prices'''
@@ -483,7 +501,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     # put price into queue as dict
                     q.put(msg.dict())
         except Exception as e:
-            self.put_notification(e)
+            self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
 
     def _t_account(self):
         '''Callback method for account request'''
@@ -499,8 +520,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 response = self.oapi.account.summary(self.p.account)
                 accinfo = response.get('account', 200)
             except Exception as e:
-                self.put_notification(e)
-                print(e, response.get('errorMessage'))
+                self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
                 continue
 
             try:
@@ -538,8 +561,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     **dtkwargs)
                 candles = response.get('candles', 200)
             except Exception as e:
-                self.put_notification(e)
-                print(e, response.get('errorMessage'))
+                self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
                 return
 
             dtobj = None
@@ -693,9 +718,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
             except Exception as e:
-                self.put_notification("{}: {}".format(
-                    e,
-                    response.get("errorMessage")))
+                self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
                 self.broker._reject(oref)
                 continue
 
@@ -717,9 +743,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 # TODO either close pending orders or filled trades
                 response = self.oapi.order.cancel(self.p.account, oid)
             except Exception as e:
-                self.put_notification("{}: {}".format(
-                    e,
-                    response.get("errorMessage")))
+                self.put_notification(
+                    self._create_error_notif(
+                        e,
+                        response))
                 continue
 
             self.broker._cancel(oref)
+
+    def _create_error_notif(self, e, response):
+        try:
+            notif = "{}: {}".format(
+                        response.get("errorCode"),
+                        response.get("errorMessage"))
+        except Exception:
+            notif = str(e)
+        return notif
