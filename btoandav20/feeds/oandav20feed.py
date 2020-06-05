@@ -222,11 +222,11 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         if self._statelivereconn:
             self.put_notification(self.DELAYED)
         if not self.p.candles:
-            # every time here we create a a new stream
+            # recreate a new stream on call
             self.qlive = self.o.streaming_prices(
                 self.p.dataname)
-        elif not instart:
-            # poll thread will never die
+        elif instart:
+            # poll thread will never die, so no need to recreate it
             self.poll_thread()
         self._state = self._ST_LIVE
         return True  # no return before - implicit continue
@@ -415,11 +415,12 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 if msg:
                     dtend = datetime.utcfromtimestamp(float(msg['time']))
 
+                # TODO not sure if incomplete candles may destruct something
                 self.qhist = self.o.candles(
                     self.p.dataname, dtbegin, dtend,
                     self._timeframe, self._compression,
                     candleFormat=self._candleFormat,
-                    includeFirst=True)
+                    includeFirst=True, onlyComplete=False)
 
                 self._state = self._ST_HISTORBACK
                 self._statelivereconn = False  # no longer in live
@@ -443,8 +444,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     continue
 
                 if msg:
-                    if not self._load_candle(msg):
-                        continue
+                    if self._load_candle(msg):
+                        return True  # loading worked
+                    continue  # not loaded ... date may have been seen
                 else:
                     # End of histdata
                     if self.p.historical:  # only historical

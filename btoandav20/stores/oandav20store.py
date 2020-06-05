@@ -261,7 +261,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             for idx, val in enumerate(inst):
                 inst[idx] = val.dict()
         except (v20.V20ConnectionError, v20.V20Timeout) as e:
-                self.put_notification(str(e))
+            self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
                     self._create_error_notif(
@@ -603,7 +603,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         count = 0
         reconnections = 0
         while True:
-            if count > 1: dtkwargs['includeFirst'] = False
+            if count > 1:
+                dtkwargs['includeFirst'] = False
             try:
                 response = self.oapi.instrument.candles(
                     dataname,
