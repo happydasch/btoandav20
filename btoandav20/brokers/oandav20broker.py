@@ -6,6 +6,7 @@ import collections
 from backtrader import BrokerBase, Order, BuyOrder, SellOrder
 from backtrader.utils.py3 import with_metaclass
 from backtrader.position import Position
+from backtrader.comminfo import CommInfoBase
 
 from ..stores import oandav20store
 

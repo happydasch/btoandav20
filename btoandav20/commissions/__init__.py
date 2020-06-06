@@ -1,4 +1,4 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from .oandav20comm import OandaV20CommInfo
+from .oandav20comm import OandaV20CommInfoBacktest
