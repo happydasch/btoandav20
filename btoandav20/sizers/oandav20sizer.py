@@ -59,15 +59,24 @@ class OandaV20Risk(OandaV20Sizer):
         ('stoploss', 10),           # stop loss in pips
     )
 
-    def _getsizing(self, comminfo, cash, data, isbuy):
+    def getsizing_stoploss(self, data, isbuy, stoploss=None):
+        comminfo = self.broker.getcommissioninfo(data)
+        return self._getsizing(
+            comminfo,
+            self.broker.getcash(),
+            data,
+            isbuy,
+            stoploss)
 
+    def _getsizing(self, comminfo, cash, data, isbuy, stoploss):
+        if not stoploss:
+            stoploss = self.p.stoploss
         position = self.broker.getposition(data)
         if position:
             return position.size
 
         name = data.contractdetails['name']
 
-        sym_from = name[:3]
         sym_to = name[4:]
         sym_src = self.o.get_currency()
 
@@ -84,7 +93,7 @@ class OandaV20Risk(OandaV20Sizer):
                 cash_to_use = cash_to_use / (1 / float(price['closeoutAsk']))
 
         size = 0
-        price_per_pip = cash_to_use / self.p.stoploss
+        price_per_pip = cash_to_use / stoploss
         price = self.o.get_pricing(name)
         if price is not None:
             size = (
