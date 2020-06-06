@@ -8,7 +8,18 @@ from backtrader.utils.py3 import with_metaclass
 from backtrader.position import Position
 
 from ..stores import oandav20store
-from ..commissions import oandav20comm
+
+
+class OandaV20CommInfo(CommInfoBase):
+    def getvaluesize(self, size, price):
+        # In real life the margin approaches the price
+        return abs(size) * price
+
+    def getoperationcost(self, size, price):
+        '''Returns the needed amount of cash an operation would cost'''
+        # Same reasoning as above
+        return abs(size) * price
+
 
 class MetaOandaV20Broker(BrokerBase.__class__):
     def __init__(self, name, bases, dct):
@@ -49,11 +60,11 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         self.startingcash = self.cash = 0.0
         self.startingvalue = self.value = 0.0
         self.positions = collections.defaultdict(Position)
-        self.addcommissioninfo(self, oandav20comm.OandaV20CommInfo())
+        self.addcommissioninfo(self, OandaV20CommInfo())
 
     def start(self):
         super(OandaV20Broker, self).start()
-        self.addcommissioninfo(self, oandav20comm.OandaV20CommInfo())
+        self.addcommissioninfo(self, OandaV20CommInfo())
         self.o.start(broker=self)
         self.startingcash = self.cash = cash = self.o.get_cash()
         self.startingvalue = self.value = self.o.get_value()
@@ -63,7 +74,6 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             if positions is None:
                 return
             for p in positions:
-                print('position for instrument:', p['instrument'])
                 size = float(p['long']['units']) + float(p['short']['units'])
                 price = (
                     float(p['long']['averagePrice']) if size > 0

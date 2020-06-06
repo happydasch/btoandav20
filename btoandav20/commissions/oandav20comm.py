@@ -1,6 +1,7 @@
 from backtrader.comminfo import CommInfoBase
 
-class OandaV20CommInfo(CommInfoBase):
+
+class OandaV20CommInfoBacktest(CommInfoBase):
     params = (
         ('spread', 2.0),
         ('stocklike', False),
@@ -32,4 +33,3 @@ class OandaV20CommInfo(CommInfoBase):
             comm = abs((self.p.spread * ((size / price) * multiplier)/2))
 
         return comm
-
