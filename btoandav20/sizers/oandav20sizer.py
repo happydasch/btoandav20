@@ -59,7 +59,7 @@ class OandaV20Risk(OandaV20Sizer):
         ('stoploss', 10),           # stop loss in pips
     )
 
-    def getsizing_stoploss(self, data, isbuy, stoploss=None):
+    def getsizing(self, data, isbuy, stoploss=None):
         comminfo = self.broker.getcommissioninfo(data)
         return self._getsizing(
             comminfo,
@@ -68,7 +68,7 @@ class OandaV20Risk(OandaV20Sizer):
             isbuy,
             stoploss)
 
-    def _getsizing(self, comminfo, cash, data, isbuy, stoploss):
+    def _getsizing(self, comminfo, cash, data, isbuy, stoploss=None):
         if not stoploss:
             stoploss = self.p.stoploss
         position = self.broker.getposition(data)
