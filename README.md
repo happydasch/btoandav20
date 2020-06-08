@@ -67,10 +67,17 @@ The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 
 **You can then access the different parts such as:**
 
+*Live:*
 * Store: ``btoandav20.stores.OandaV20Store``
 * Data Feed: ``btoandav20.feeds.OandaV20Data``
 * Broker: ``btoandav20.brokers.OandaV20Broker``
-* Sizers: ``btoandav20.sizers.OandaV20Cash`` (other sizers are available)
+* Sizers: ``btoandav20.sizers.OandaV20Cash,btoandav20.sizers.OandaV20Percent,btoandav20.sizers.OandaV20RiskCash,btoandav20.sizers.OandaV20RiskPercent``
+
+*Backtesting:*
+* Sizers:
+  (To be done)
+* Commissioninfo:
+``btoandav20.commissions.OandaV20CommInfoBacktest``
 
 If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/ and create a new issue if this doesn't solve it.
 
