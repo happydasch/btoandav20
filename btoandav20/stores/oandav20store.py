@@ -70,10 +70,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
       - ``practice`` (default: ``False``): use the test environment
 
-      - ``account_poll_freq`` (default: ``10.0``): refresh frequency for
+      - ``account_poll_freq`` (default: ``5.0``): refresh frequency for
         account value/cash refresh
 
-     - ``stream_timeout`` (default: ``10``): timeout for stream requests
+     - ``stream_timeout`` (default: ``2``): timeout for stream requests
 
      - ``poll_timeout`` (default: ``2``): timeout for poll requests
 
@@ -88,8 +88,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         ('token', ''),
         ('account', ''),
         ('practice', False),
-        ('account_poll_freq', 10.0),  # account balance refresh timeout
-        ('stream_timeout', 10),
+        ('account_poll_freq', 5.0),  # account balance refresh timeout
+        ('stream_timeout', 2),
         ('poll_timeout', 2),
         ('reconnections', -1),
         ('reconntimeout', 5.0),
