@@ -61,14 +61,17 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         self.startingcash = self.cash = 0.0
         self.startingvalue = self.value = 0.0
         self.positions = collections.defaultdict(Position)
-        self.addcommissioninfo(self, OandaV20CommInfo())
 
     def start(self):
         super(OandaV20Broker, self).start()
-        self.addcommissioninfo(self, OandaV20CommInfo())
         self.o.start(broker=self)
         self.startingcash = self.cash = cash = self.o.get_cash()
         self.startingvalue = self.value = self.o.get_value()
+        comminfo = OandaV20CommInfo(
+            leverage=self.o.get_leverage(),
+            stocklike=False,
+            commtype=CommInfoBase.COMM_FIXED)
+        self.addcommissioninfo(self, comminfo)
 
         if self.p.use_positions:
             positions = self.o.get_positions()

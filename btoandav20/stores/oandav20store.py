@@ -162,6 +162,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._cash = 0.0  # margin available, currently available cash
         self._value = 0.0  # account balance
         self._currency = None  # account currency
+        self._leverage = 1 # leverage
 
         self.broker = None  # broker instance
         self.datas = list()  # datas that have registered over start
@@ -352,6 +353,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         '''Returns the currency of the account'''
         return self._currency
 
+    def get_leverage(self):
+        '''Returns the leverage of the account'''
+        return self._leverage
+
     def broker_threads(self):
         '''Creates threads for broker functionality'''
         self.q_account = queue.Queue()
@@ -520,6 +525,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self._cash = accinfo.marginAvailable
                 self._value = accinfo.balance
                 self._currency = accinfo.currency
+                self._leverage = 1/accinfo.marginRate
             except KeyError:
                 pass
 
