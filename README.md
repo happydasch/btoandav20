@@ -22,6 +22,7 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 * Broker
 * Data Feeds
 * Sizers
+* Commissions
 
 **Available features:**
 
@@ -30,20 +31,28 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 * Streaming events
 * Get *unlimited* history prices for backtesting
 * Replay functionality for backtesting
+
 * Support different type of orders:
-  * Order.Market
-  * Order.Limit
-  * Order.Stop
-  * Order.StopLimit (using Stop and upperBound / lowerBound prices) *may not be possible*
+    * Order.Market
+    * Order.Limit
+    * Order.Stop
+    * Order.StopLimit (using Stop and upperBound / lowerBound prices) *may not be possible*
   * Order.StopTrail (will only work in buy and sell brackets)
   * Bracket orders are supported by using the takeprofit and stoploss order members and creating internally simulated orders.
-* 4 different Sizers:
-  * OandaV20Percent - returns position size which matches the percent amount of total cash
-  * OandaV20Cash - return position size which matches the cash amount
-  * OandaV20RiskPercent - returns position size which matches the total risk in percent of total amount (max stop loss)
-  * OandaV20RiskCash - returns position size which matches the total risk in percent of total amount (max stop loss)
+
+* 4 different OandaV20 Sizers:
+    * OandaV20PercentSizer - returns position size which matches the percent amount of total cash
+    * OandaV20CashSizer - return position size which matches the cash amount
+    * OandaV20RiskPercentSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
+    * OandaV20RiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
+
+* 4 different Forex Sizers:
+    * ForexPercentSizer - returns position size which matches the percent amount of total cash
+    * ForexCashSizer - return position size which matches the cash amount
+    * ForexRiskPercentSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
+    * ForexRiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
 * Possibility to load existing positions from the OANDA account
-* Reconnects on broken connections and after timeouts, also backfills data after a timeout or disconnect occured
+* Reconnects on broken connections and after timeouts, also backfills data after a timeout or disconnect occurred
 
 
 
@@ -68,19 +77,25 @@ The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 **You can then access the different parts such as:**
 
 *Live:*
+
 * Store: ``btoandav20.stores.OandaV20Store``
 * Data Feed: ``btoandav20.feeds.OandaV20Data``
 * Broker: ``btoandav20.brokers.OandaV20Broker``
 * Sizers:
-  * ``btoandav20.sizers.OandaV20Percent``
-  * ``btoandav20.sizers.OandaV20Cash``
-  * ``btoandav20.sizers.OandaV20RiskPercent``
-  * ``btoandav20.sizers.OandaV20RiskCash``
+    * ``btoandav20.sizers.OandaV20PercentSizer``
+    * ``btoandav20.sizers.OandaV20CashSizer``
+    * ``btoandav20.sizers.OandaV20RiskPercentSizer``
+    * ``btoandav20.sizers.OandaV20RiskCashSizer``
 
 *Backtesting:*
+
 * Sizers:
-  (To be done)
+    * ``btoandav20.sizers.ForexPercentSizer``
+    * ``btoandav20.sizers.ForexCashSizer``
+    * ``btoandav20.sizers.ForexRiskPercentSizer``
+    * ``btoandav20.sizers.ForexRiskCashSizer``
 * Commissioninfo: ``btoandav20.commissions.OandaV20CommInfoBacktest``
+
 
 If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/ and create a new issue if this doesn't solve it.
 
