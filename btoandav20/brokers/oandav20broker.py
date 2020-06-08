@@ -171,7 +171,7 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         if len(br) == 3:  # all 3 orders in place, parent was filled
             br = br[1:]  # discard index 0, parent
             for o in br:
-                o.activate()  # simulate activate for children
+                o and o.activate()  # simulate activate for children
             self.brackets[pref] = br  # not done - reinsert children
 
         elif len(br) == 2:  # filling a children
