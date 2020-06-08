@@ -13,6 +13,7 @@ class OandaV20Sizer(bt.Sizer):
     )
 
     def __init__(self, **kwargs):
+        super(OandaV20Sizer, self).__init__(**kwargs)
         self.o = oandav20store.OandaV20Store(**kwargs)
 
     def _getsizing(self, comminfo, cash, data, isbuy):
@@ -51,13 +52,17 @@ class OandaV20Cash(OandaV20Sizer):
     )
 
 
-class OandaV20Risk(OandaV20Sizer):
+class OandaV20RiskSizer(bt.Sizer):
 
     params = (
-        ('risk_amount', 0),        # risk amount
-        ('risk_percents', 0),       # risk percents
-        ('stoploss', 10),           # stop loss in pips
+        ('percents', 0),   # risk percents
+        ('amount', 0),     # risk amount
+        ('stoploss', 10),  # stop loss in pips
     )
+
+    def __init__(self, **kwargs):
+        super(OandaV20RiskSizer, self).__init__(**kwargs)
+        self.o = oandav20store.OandaV20Store(**kwargs)
 
     def getsizing(self, data, isbuy, stoploss=None):
         comminfo = self.broker.getcommissioninfo(data)
@@ -81,10 +86,10 @@ class OandaV20Risk(OandaV20Sizer):
         sym_src = self.o.get_currency()
 
         cash_to_use = 0
-        if self.p.risk_percents != 0:
-            cash_to_use = cash * (self.p.risk_percents / 100)
-        elif self.p.risk_amount != 0:
-            cash_to_use = self.p.risk_amount
+        if self.p.percents != 0:
+            cash_to_use = cash * (self.p.percents / 100)
+        elif self.p.amount != 0:
+            cash_to_use = self.p.amount
 
         if sym_src != sym_to:
             # convert cash to target currency
@@ -111,15 +116,15 @@ class OandaV20Risk(OandaV20Sizer):
         return int(size)
 
 
-class OandaV20RiskPercent(OandaV20Sizer):
+class OandaV20RiskPercent(OandaV20RiskSizer):
 
     params = (
-        ('risk_percents', 5),
+        ('percents', 5),
     )
 
 
-class OandaV20RiskCash(OandaV20Sizer):
+class OandaV20RiskCash(OandaV20RiskSizer):
 
     params = (
-        ('risk_amount', 50),
+        ('amount', 50),
     )
