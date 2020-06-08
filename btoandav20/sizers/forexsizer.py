@@ -47,9 +47,9 @@ class ForexCashSizer(ForexSizer):
 class ForexRiskSizer(bt.Sizer):
 
     params = (
-        ('percents', 0),   # percents of cash
-        ('stoploss', 5),  # stop loss in pips
+        ('percents', 0),   # risk percents
         ('amount', 0),     # risk amount
+        ('stoploss', 5),  # stop loss in pips
         ('acc_counter_currency', True),  # is account in counter currency
     )
 
@@ -75,6 +75,7 @@ class ForexRiskSizer(bt.Sizer):
         position = self.broker.getposition(data)
         if position:
             return position.size
+        avail = self._getmaxavailable(data, comminfo)
         price = data.close[0]
         cash = self.broker.getcash()
         if self.p.percents != 0:
@@ -82,12 +83,10 @@ class ForexRiskSizer(bt.Sizer):
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
         price_per_pip = cash_to_use / stoploss
-        size = price_per_pip * cash
+        size = (avail / cash) * (price_per_pip * cash_to_use)
         if not self.p.acc_counter_currency:
             size = size / price
-        size = min(size, self._getmaxavailable(
-            data,
-            comminfo))
+        size = min(size, avail)
         return int(size)
 
 
