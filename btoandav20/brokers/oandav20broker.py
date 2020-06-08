@@ -71,7 +71,8 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             leverage=self.o.get_leverage(),
             stocklike=False,
             commtype=CommInfoBase.COMM_FIXED)
-        self.addcommissioninfo(self, comminfo)
+        # set as default comminfo
+        self.addcommissioninfo(comminfo, name=None)
 
         if self.p.use_positions:
             positions = self.o.get_positions()
