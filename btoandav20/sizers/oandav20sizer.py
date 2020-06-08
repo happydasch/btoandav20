@@ -38,14 +38,14 @@ class OandaV20Sizer(bt.Sizer):
         return int(size)
 
 
-class OandaV20Percent(OandaV20Sizer):
+class OandaV20PercentSizer(OandaV20Sizer):
 
     params = (
         ('percents', 5),
     )
 
 
-class OandaV20Cash(OandaV20Sizer):
+class OandaV20CashSizer(OandaV20Sizer):
 
     params = (
         ('amount', 50),
@@ -116,14 +116,14 @@ class OandaV20RiskSizer(bt.Sizer):
         return int(size)
 
 
-class OandaV20RiskPercent(OandaV20RiskSizer):
+class OandaV20RiskPercentSizer(OandaV20RiskSizer):
 
     params = (
         ('percents', 5),
     )
 
 
-class OandaV20RiskCash(OandaV20RiskSizer):
+class OandaV20RiskCashSizer(OandaV20RiskSizer):
 
     params = (
         ('amount', 50),
