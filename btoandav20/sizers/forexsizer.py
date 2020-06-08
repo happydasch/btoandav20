@@ -91,7 +91,7 @@ class ForexRiskSizer(bt.Sizer):
         return int(size)
 
 
-class ForexRiskPercent(ForexRiskSizer):
+class ForexRiskPercentSizer(ForexRiskSizer):
 
     params = (
         ('percents', 5),
