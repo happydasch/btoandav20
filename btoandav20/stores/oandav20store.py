@@ -12,6 +12,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from http import client
 
 
 class SerializableEvent(object):
@@ -163,6 +164,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._value = 0.0  # account balance
         self._currency = None  # account currency
         self._leverage = 1 # leverage
+        self._client_id_prefix = str(datetime.timestamp())
 
         self.broker = None  # broker instance
         self.datas = list()  # datas that have registered over start
@@ -437,7 +439,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         trailamount,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
-                        id=str(stopside.ref)
+                        id=self._oref_to_client_id(stopside.ref)
                     ).dict()
                 ).dict()
             else:
@@ -446,7 +448,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         stopside.price,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
-                        id=str(stopside.ref)
+                        id=self._oref_to_client_id(stopside.ref)
                     ).dict()
                 ).dict()
 
@@ -456,13 +458,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     takeside.price,
                     '.%df' % order.data.contractdetails['displayPrecision']),
                 clientExtensions=v20.transaction.ClientExtensions(
-                    id=str(takeside.ref)
+                    id=self._oref_to_client_id(takeside.ref)
                 ).dict()
             ).dict()
 
         # store backtrader order ref in client extensions
         okwargs['clientExtensions'] = v20.transaction.ClientExtensions(
-            id=str(order.ref)
+            id=self._oref_to_client_id(order.ref)
         ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
@@ -494,6 +496,18 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t.daemon = True
         t.start()
         return q
+
+    def _oref_to_client_id(self, oref):
+        '''Converts a oref to client id'''
+        id = "{}-{}".format(self._client_id_prefix, oref)
+        return id
+
+    def _client_id_to_oref(self, client_id):
+        '''Converts a client id to oref'''
+        oref = None
+        if str(client_id).startswith(self._client_id_prefix):
+            oref = int(str(client_id)[len(self._client_id_prefix)+1:])
+        return oref
 
     def _t_account(self):
         '''Callback method for account request'''
@@ -695,7 +709,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # identify backtrader order by checking client extensions (this is used when creating a order)
             if 'clientExtensions' in trans:
                 # assume backtrader created the order for this transaction
-                oref = int(trans['clientExtensions']['id'])
+                oref = self._client_id_to_oref(trans['clientExtensions']['id'])
             if oref is not None:
                 self._orders[oid] = oref
 
