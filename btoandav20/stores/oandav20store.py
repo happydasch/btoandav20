@@ -12,7 +12,6 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
-from http import client
 
 
 class SerializableEvent(object):
