@@ -1,26 +1,25 @@
 import backtrader as bt
 
 
+'''
+https://www1.oanda.com/lang/en/forex-trading/analysis/currency-units-calculator
+'''
+
+
 class ForexSizer(bt.Sizer):
 
     params = (
         ('percents', 0),   # percents of cash
         ('amount', 0),  # amount of cash
-        ('acc_counter_currency', True),  # is account in counter currency
     )
-
-    def _getmaxavailable(self, data, comminfo):
-        # https://www1.oanda.com/lang/en/forex-trading/analysis/currency-units-calculator
-        avail = self.broker.getcash() * comminfo.get_leverage()
-        if not self.p.acc_counter_currency:
-            avail = avail / data.close[0]
-        return avail
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         position = self.broker.getposition(data)
         if position:
             return position.size
-        avail = self._getmaxavailable(data, comminfo)
+        cash = self.broker.getcash()
+        price = data.close[0]
+        avail = comminfo.getsize(price, cash)
         if self.p.percents != 0:
             size = avail * (self.p.percents / 100)
         elif self.p.amount != 0:
@@ -50,15 +49,7 @@ class ForexRiskSizer(bt.Sizer):
         ('percents', 0),   # risk percents
         ('amount', 0),     # risk amount
         ('stoploss', 5),  # stop loss in pips
-        ('acc_counter_currency', True),  # is account in counter currency
     )
-
-    def _getmaxavailable(self, data, comminfo):
-        # https://www1.oanda.com/lang/en/forex-trading/analysis/currency-units-calculator
-        avail = self.broker.getcash() * comminfo.get_leverage()
-        if not self.p.acc_counter_currency:
-            avail = avail / data.close[0]
-        return avail
 
     def getsizing(self, data, isbuy, stoploss=None):
         comminfo = self.broker.getcommissioninfo(data)
@@ -75,18 +66,16 @@ class ForexRiskSizer(bt.Sizer):
         position = self.broker.getposition(data)
         if position:
             return position.size
-        avail = self._getmaxavailable(data, comminfo)
-        price = data.close[0]
         cash = self.broker.getcash()
+        price = data.close[0]
+        avail = comminfo.getsize(price, cash)
         if self.p.percents != 0:
             cash_to_use = cash * (self.p.percents/100)
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
         price_per_pip = cash_to_use / stoploss
-        size = (avail / cash) * (price_per_pip * cash_to_use)
-        if not self.p.acc_counter_currency:
-            size = size / price
-        size = min(size, avail)
+        size = price_per_pip * (avail / cash)
+        size *= comminfo.get_leverage()
         return int(size)
 
 
@@ -97,7 +86,7 @@ class ForexRiskPercentSizer(ForexRiskSizer):
     )
 
 
-class ForexRiskCash(ForexRiskSizer):
+class ForexRiskCashSizer(ForexRiskSizer):
 
     params = (
         ('amount', 50),

@@ -7,8 +7,11 @@ class OandaV20CommInfoBacktest(CommInfoBase):
         ('stocklike', False),
         ('pip_location', -4),
         ('acc_counter_currency', True),
+        ('automargin', 1.00),
+        ('leverage', 1),
+        ('mult', 1),
         ('commtype', CommInfoBase.COMM_FIXED),
-        )
+    )
 
     def getvaluesize(self, size, price):
         # In real life the margin approaches the price
@@ -26,10 +29,5 @@ class OandaV20CommInfoBacktest(CommInfoBase):
         https://community.backtrader.com/topic/525/forex-commission-scheme
         '''
         multiplier = float(10 ** self.p.pip_location)
-
-        if self.p.acc_counter_currency == True:
-            comm = abs((self.p.spread * (size * multiplier)/2))
-        else:
-            comm = abs((self.p.spread * ((size / price) * multiplier)/2))
-
+        comm = abs((self.p.spread * ((size / price) * multiplier)/2))
         return comm
