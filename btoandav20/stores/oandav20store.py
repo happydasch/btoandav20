@@ -16,6 +16,7 @@ from backtrader.utils.py3 import queue, with_metaclass
 
 class SerializableEvent(object):
     '''A threading.Event that can be serialized.'''
+
     def __init__(self):
         self.evt = threading.Event()
 
@@ -162,8 +163,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._cash = 0.0  # margin available, currently available cash
         self._value = 0.0  # account balance
         self._currency = None  # account currency
-        self._leverage = 1 # leverage
-        self._client_id_prefix = str(datetime.timestamp())
+        self._leverage = 1  # leverage
+        self._client_id_prefix = str(datetime.now().timestamp())
 
         self.broker = None  # broker instance
         self.datas = list()  # datas that have registered over start
@@ -239,9 +240,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
+                self._create_error_notif(
+                    e,
+                    response))
 
         try:
             return pos
@@ -266,9 +267,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
+                self._create_error_notif(
+                    e,
+                    response))
 
         try:
             return inst[0]
@@ -289,9 +290,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
+                self._create_error_notif(
+                    e,
+                    response))
 
         try:
             return inst
@@ -311,9 +312,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
+                self._create_error_notif(
+                    e,
+                    response))
 
         try:
             return prices[0]
@@ -333,12 +334,57 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self.put_notification(str(e))
         except Exception as e:
             self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
+                self._create_error_notif(
+                    e,
+                    response))
 
         try:
             return prices
+        except NameError:
+            return None
+
+    def get_transactions_range(self, from_id, to_id, exclude_outer=False):
+        '''Returns all transactions between range'''
+        try:
+            response = self.oapi.transaction.range(
+                self.p.account,
+                fromID=from_id,
+                toID=to_id)
+            transactions = response.get('transactions', 200)
+            if exclude_outer:
+                del transactions[0], transactions[-1]
+
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
+        except Exception as e:
+            self.put_notification(
+                self._create_error_notif(
+                    e,
+                    response))
+
+        try:
+            return transactions
+        except NameError:
+            return None
+
+    def get_transactions_since(self, id):
+        '''Returns all transactions since id'''
+        try:
+            response = self.oapi.transaction.since(
+                self.p.account,
+                id=id)
+            transactions = response.get('transactions', 200)
+
+        except (v20.V20ConnectionError, v20.V20Timeout) as e:
+            self.put_notification(str(e))
+        except Exception as e:
+            self.put_notification(
+                self._create_error_notif(
+                    e,
+                    response))
+
+        try:
+            return transactions
         except NameError:
             return None
 
@@ -547,23 +593,38 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _t_streaming_events(self, q):
         '''Callback method for streaming events'''
+        last_id = None
         reconnections = 0
         while True:
             try:
                 response = self.oapi_stream.transaction.stream(
                     self.p.account
                 )
-                # reset reconnections after successfully connected
-                reconnections = 0
                 # process response
                 for msg_type, msg in response.parts():
+                    # if a connection occurred
+                    if reconnections > 0:
+                        if reconnections > 0 and last_id:
+                            # get all transactions between the last seen and first from
+                            # reconnected stream
+                            old_transactions = self.get_transactions_since(
+                                last_id)
+                            for t in old_transactions:
+                                if msg_type == "transaction.Transaction":
+                                    if t.id > last_id:
+                                        self._transaction(t.dict())
+                                        last_id = t.id
+                        reconnections = 0
                     if msg_type == "transaction.Transaction":
-                        self._transaction(msg.dict())
+                        if not last_id or msg.id > last_id:
+                            self._transaction(msg.dict())
+                            last_id = msg.id
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
                 if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
                     # unable to reconnect after x times
-                    self.put_notification("Giving up reconnecting streaming events")
+                    self.put_notification(
+                        "Giving up reconnecting streaming events")
                     return
                 reconnections += 1
                 if self.p.reconntimeout is not None:
@@ -574,10 +635,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 continue
             except Exception as e:
                 self.put_notification(
-                        self._create_error_notif(
-                            e,
-                            response))
-                return
+                    self._create_error_notif(
+                        e,
+                        response))
 
     def _t_streaming_prices(self, dataname, q):
         '''Callback method for streaming prices'''
@@ -602,9 +662,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             q.put({"msg": "CONNECTION_ISSUE"})
         except Exception as e:
             self.put_notification(
-                    self._create_error_notif(
-                        e,
-                        response))
+                self._create_error_notif(
+                    e,
+                    response))
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, onlyComplete, q):
@@ -846,8 +906,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     def _create_error_notif(self, e, response):
         try:
             notif = "{}: {}".format(
-                        response.get("errorCode"),
-                        response.get("errorMessage"))
+                response.get("errorCode"),
+                response.get("errorMessage"))
         except Exception:
             notif = str(e)
         return notif
