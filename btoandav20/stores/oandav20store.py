@@ -133,7 +133,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.Limit: 'LIMIT',
         bt.Order.Stop: 'STOP',
         bt.Order.StopLimit: 'STOP',
-        bt.Order.StopTrail: 'STOP',
+        bt.Order.StopTrail: 'TRAILING_STOP_LOSS',
     }
 
     # Date format used
