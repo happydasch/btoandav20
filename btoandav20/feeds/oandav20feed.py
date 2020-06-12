@@ -373,6 +373,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                         self._state = self._ST_OVER
                         return False  # failed
 
+                    _time.sleep(self.o.p.stream_timeout)
                     # Can reconnect
                     self._reconns -= 1
                     self._st_start(instart=False)
