@@ -133,6 +133,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.Limit: 'LIMIT',
         bt.Order.Stop: 'STOP',
         bt.Order.StopLimit: 'STOP',
+        bt.Order.StopTrail: 'STOP',
     }
 
     # Date format used
@@ -468,6 +469,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         if order.exectype == bt.Order.StopTrail:
             trailamount = order.trailamount
+            if "oref" not in kwargs:
+                raise Exception("oref needed for StopTrail order")
+            okwargs["clientTradeID"] = self.oref_to_client_id(kwargs["oref"])
             if order.trailpercent:
                 trailamount = order.price * order.trailpercent
             okwargs['distance'] = format(
@@ -484,7 +488,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         trailamount,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
-                        id=self._oref_to_client_id(stopside.ref)
+                        id=self.oref_to_client_id(stopside.ref)
                     ).dict()
                 ).dict()
             else:
@@ -493,7 +497,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         stopside.price,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
-                        id=self._oref_to_client_id(stopside.ref)
+                        id=self.oref_to_client_id(stopside.ref)
                     ).dict()
                 ).dict()
 
@@ -503,13 +507,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     takeside.price,
                     '.%df' % order.data.contractdetails['displayPrecision']),
                 clientExtensions=v20.transaction.ClientExtensions(
-                    id=self._oref_to_client_id(takeside.ref)
+                    id=self.oref_to_client_id(takeside.ref)
                 ).dict()
             ).dict()
 
         # store backtrader order ref in client extensions
         okwargs['clientExtensions'] = v20.transaction.ClientExtensions(
-            id=self._oref_to_client_id(order.ref)
+            id=self.oref_to_client_id(order.ref)
         ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
@@ -542,12 +546,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         t.start()
         return q
 
-    def _oref_to_client_id(self, oref):
+    def oref_to_client_id(self, oref):
         '''Converts a oref to client id'''
         id = "{}-{}".format(self._client_id_prefix, oref)
         return id
 
-    def _client_id_to_oref(self, client_id):
+    def client_id_to_oref(self, client_id):
         '''Converts a client id to oref'''
         oref = None
         if str(client_id).startswith(self._client_id_prefix):
@@ -768,7 +772,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # identify backtrader order by checking client extensions (this is used when creating a order)
             if 'clientExtensions' in trans:
                 # assume backtrader created the order for this transaction
-                oref = self._client_id_to_oref(trans['clientExtensions']['id'])
+                oref = self.client_id_to_oref(trans['clientExtensions']['id'])
             if oref is not None:
                 self._orders[oid] = oref
 
