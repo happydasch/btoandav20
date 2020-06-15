@@ -72,14 +72,14 @@ stopexec: bt.Order.StopTrail
 
 orderexec: bt.Order.Stop,
 
-limitexec: bt.Order.Limit
+stopexec: bt.Order.StopLimit
 
-The stopside and limitside will be filled, when the parent order gets filled.
+The stopside will be filled, when the parent order gets filled.
 
 
 ### Changing StopTrail, StopLimit or StopTrailLimit order
 
-To change a StopTrail, StopLimit or StopTrailLimit order the stopside or limitside needs to be canceled and a new order with the order type StopTrail or StopLimit needs to be created.
+To change a StopTrail, StopLimit or StopTrailLimit order the stopside needs to be canceled and a new order with the order type StopTrail or StopLimit needs to be created.
 
 Also an oref of the original order needs to be provided, when creating this order.
 The order needs to go into the opposing direction.
@@ -110,7 +110,7 @@ The order needs to go into the opposing direction.
 
 *Create StopTrailLimit order*
 
-- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Otder.Stop)
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Order.StopLimit)
 
 *Change stop side*
 
