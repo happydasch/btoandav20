@@ -93,6 +93,7 @@ o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, limitexec=bt.Order.Limit,
 *Create new limit for parent order*
 
 self.cancel(olimit)
+
 self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
 
 
@@ -105,6 +106,7 @@ o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTra
 *Create new trailing stop for parent order*
 
 self.cancel(ostop)
+
 self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
 
 
@@ -117,11 +119,13 @@ o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTra
 *Change stop side*
 
 self.cancel(ostop)
+
 self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
 
 *Change limit side*
 
 self.cancel(olimit)
+
 self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
 
 
