@@ -88,7 +88,7 @@ The order needs to go into the opposing direction.
 
 *Create StopLimit order*
 
-- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, limitexec=bt.Order.Limit, stopexec=None)
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopLimit, limitexec=None)
 
 *Create new limit for parent order*
 
@@ -110,7 +110,7 @@ The order needs to go into the opposing direction.
 
 *Create StopTrailLimit order*
 
-- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Otder.Limit)
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Otder.Stop)
 
 *Change stop side*
 

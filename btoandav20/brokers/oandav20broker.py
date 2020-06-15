@@ -263,19 +263,13 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             if oref != pref:  # children order
                 # Put parent in orders dict, but add stopside and takeside
                 # to order creation. Return the takeside order, to have 3s
+                takeside = order  # alias for clarity
                 # ensure at least parent is available
                 pending = self.opending.pop(pref)
                 # ensure there are two items in list before unpacking
                 while len(pending) < 2:
                     pending.append(None)
-                parent, child = pending
-
-                if isinstance(order, parent):
-                    stopside = child
-                    takeside = order
-                else:
-                    stopside = order
-                    takeside = child
+                parent, stopside = pending
                 for o in parent, stopside, takeside:
                     if o is not None:
                         self.orders[o.ref] = o  # write them down
