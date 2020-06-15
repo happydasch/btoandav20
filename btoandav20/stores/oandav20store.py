@@ -497,14 +497,14 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         if order.exectype == bt.Order.StopLimit:
             if "replace" not in okwargs:
-                raise Exception("replace needed for StopLimit order")
+                raise Exception("replace param needed for StopLimit order")
             okwargs['price'] = format(
-                order.created.price,
+                order.plimit or order.price,
                 '.%df' % order.data.contractdetails['displayPrecision'])
 
         if order.exectype == bt.Order.StopTrail:
             if "replace" not in okwargs:
-                raise Exception("replace needed for StopTrail order")
+                raise Exception("replace param needed for StopTrail order")
             trailamount = order.trailamount
             if order.trailpercent:
                 trailamount = order.price * order.trailpercent
