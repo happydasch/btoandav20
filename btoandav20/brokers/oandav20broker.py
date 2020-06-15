@@ -261,22 +261,28 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
 
         if order.transmit:
             if oref != pref:  # children order
-                # Put parent in orders dict, but add stopside and takeside
-                # to order creation. Return the takeside order, to have 3s
-                takeside = order  # alias for clarity
-                # ensure at least parent is available
+                # get pending orders, parent is needed, child may be None
                 pending = self.opending.pop(pref)
                 # ensure there are two items in list before unpacking
                 while len(pending) < 2:
                     pending.append(None)
-                parent, stopside = pending
+                parent, child = pending
+                # set takeside and stopside
+                if order.exectype == order.StopTrail:
+                    stopside = order
+                    takeside = child
+                elif order.exectype == order.StopLimit:
+                    takeside = order
+                    stopside = child
+                else:
+                    takeside = order
+                    stopside = child
                 for o in parent, stopside, takeside:
                     if o is not None:
                         self.orders[o.ref] = o  # write them down
-
                 self.brackets[pref] = [parent, stopside, takeside]
                 self.o.order_create(parent, stopside, takeside)
-                return takeside  # parent was already returned
+                return takeside or stopside
 
             else:  # Parent order, which is being transmitted
                 self.orders[order.ref] = order
