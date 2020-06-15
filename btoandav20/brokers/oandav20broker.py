@@ -8,7 +8,7 @@ from backtrader.utils.py3 import with_metaclass
 from backtrader.position import Position
 from backtrader.comminfo import CommInfoBase
 
-from ..stores import oandav20store
+from btoandav20.stores import oandav20store
 
 
 class OandaV20CommInfo(CommInfoBase):
@@ -44,8 +44,8 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         Set to ``False`` during instantiation to disregard any existing
         position
     '''
-    params = (
-        ('use_positions', True),
+    params = dict(
+        use_positions=True,
     )
 
     def __init__(self, **kwargs):
@@ -65,7 +65,7 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
     def start(self):
         super(OandaV20Broker, self).start()
         self.o.start(broker=self)
-        self.startingcash = self.cash = cash = self.o.get_cash()
+        self.startingcash = self.cash = self.o.get_cash()
         self.startingvalue = self.value = self.o.get_value()
         comminfo = OandaV20CommInfo(
             leverage=self.o.get_leverage(),
@@ -236,7 +236,6 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         data = order.data
         pos = self.getposition(data, clone=False)
         psize, pprice, opened, closed = pos.update(size, price)
-        comminfo = self.getcommissioninfo(data)
 
         closedvalue = closedcomm = 0.0
         openedvalue = openedcomm = 0.0
@@ -264,13 +263,19 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             if oref != pref:  # children order
                 # Put parent in orders dict, but add stopside and takeside
                 # to order creation. Return the takeside order, to have 3s
-                takeside = order  # alias for clarity
                 # ensure at least parent is available
-                if len(self.opending) > 1:
-                    parent, stopside = self.opending.pop(pref)
+                pending = self.opending.pop(pref)
+                # ensure there are two items in list before unpacking
+                while len(pending) < 2:
+                    pending.append(None)
+                parent, child = pending
+
+                if isinstance(order, parent):
+                    stopside = child
+                    takeside = order
                 else:
-                    parent = self.opending.pop(pref)[0]
-                    stopside = None
+                    stopside = order
+                    takeside = child
                 for o in parent, stopside, takeside:
                     if o is not None:
                         self.orders[o.ref] = o  # write them down
@@ -323,10 +328,10 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
 
     def cancel(self, order):
         o = self.orders[order.ref]
-        if order.status == Order.Cancelled:  # already cancelled
+        if o.status == Order.Cancelled:  # already cancelled
             return
 
-        return self.o.order_cancel(order)
+        return self.o.order_cancel(o)
 
     def notify(self, order):
         self.notifs.append(order.clone())

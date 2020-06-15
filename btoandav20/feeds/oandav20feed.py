@@ -10,7 +10,7 @@ from backtrader.feed import DataBase
 from backtrader import TimeFrame, date2num, num2date
 from backtrader.utils.py3 import queue, with_metaclass
 
-from ..stores import oandav20store
+from btoandav20.stores import oandav20store
 
 
 class MetaOandaV20Data(DataBase.__class__):
@@ -117,17 +117,18 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
     Any other combination will be rejected
     '''
-    params = (
-        ('qcheck', 0.5),
-        ('historical', False),  # do backfilling at the start
-        ('backfill_start', True),  # do backfilling at the start
-        ('backfill', True),  # do backfilling when reconnecting
-        ('backfill_from', None),  # additional data source to do backfill from
-        ('bidask', True),
-        ('useask', False),
-        ('candles', False),
-        ('reconnect', True),
-        ('reconnections', -1),  # forever
+    params = dict(
+        qcheck=0.5,
+        historical=False,     # do backfilling at the start
+        backfill_start=True,  # do backfilling at the start
+        backfill=True,        # do backfilling when reconnecting
+        backfill_from=None,   # additional data source to do backfill from
+        bidask=True,
+        useask=False,
+        candles=False,
+        # TODO readd tmout - set timeout in store
+        reconnect=True,
+        reconnections=-1,     # forever
     )
 
     _store = oandav20store.OandaV20Store
@@ -304,6 +305,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             if offset:
                 dt = dt - timedelta(minutes=compression*offset)
         elif timeframe == TimeFrame.Days:
+            # TODO use sessionstart if available, else use 0
             # start of day is UTC 22 (5pm new york)
             if dt.hour < 22:
                 dt = dt - timedelta(days=1)
@@ -316,6 +318,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 dt = dt - timedelta(days=dt.weekday() + 1)
             if offset:
                 dt = dt - timedelta(days=offset * 7)
+            # TODO use sessionstart if available, else use 0
             dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
         elif timeframe == TimeFrame.Months:
             if offset:
@@ -328,6 +331,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             # start of month (1 at 0, 22 last day of prev month)
             if dt.day < last_day_of_month:
                 dt = dt - timedelta(days=dt.day)
+            # TODO use sessionstart if available, else use 0
             dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
         return dt
 
@@ -372,8 +376,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                         self.put_notification(self.DISCONNECTED)
                         self._state = self._ST_OVER
                         return False  # failed
-
-                    _time.sleep(self.o.p.stream_timeout)
+                    # sleep only on reconnect
+                    if self._reconns != self.p.reconnections:
+                        _time.sleep(self.o.p.reconntimeout)
                     # Can reconnect
                     self._reconns -= 1
                     self._st_start(instart=False)

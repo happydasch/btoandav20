@@ -85,15 +85,22 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
          stream (feeds have own reconnection settings)
     '''
 
-    params = (
-        ('token', ''),
-        ('account', ''),
-        ('practice', False),
-        ('account_poll_freq', 5.0),  # account balance refresh timeout
-        ('stream_timeout', 2),
-        ('poll_timeout', 2),
-        ('reconnections', -1),
-        ('reconntimeout', 5.0),
+    params = dict(
+        token='',
+        account='',
+        practice=False,
+        # account balance refresh timeout
+        account_poll_freq=5.0,
+        # stream timeout
+        stream_timeout=2,
+        # poll timeout
+        poll_timeout=2,
+        # count of reconnections, -1 unlimited, 0 none
+        reconnections=-1,
+        # timeout between reconnections
+        reconntimeout=5.0,
+        # send store notification with recieved transactions
+        notif_transactions=False,
     )
 
     BrokerCls = None  # broker class will auto register
@@ -132,9 +139,31 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.Market: 'MARKET',
         bt.Order.Limit: 'LIMIT',
         bt.Order.Stop: 'STOP',
-        bt.Order.StopLimit: 'STOP',
-        bt.Order.StopTrail: 'TRAILING_STOP_LOSS',
+        bt.Order.StopLimit: 'LIMIT',
+        bt.Order.StopTrail: 'STOP_LOSS_ORDER'
     }
+
+    # transactions which will be emitted on creating/accepting a order
+    _X_CREATE_TRANS = ['MARKET_ORDER',
+                       'LIMIT_ORDER',
+                       'STOP_ORDER',
+                       'TAKE_PROFIT_ORDER',
+                       'STOP_LOSS_ORDER',
+                       'TRAILING_STOP_LOSS_ORDER']
+    # transactions which filled orders
+    _X_FILL_TRANS = ['ORDER_FILL']
+    # transactions which cancelled orders
+    _X_CANCEL_TRANS = ['ORDER_CANCEL']
+    # transactions which were rejected
+    _X_REJECT_TRANS = ['MARKET_ORDER_REJECT',
+                       'LIMIT_ORDER_REJECT',
+                       'STOP_ORDER_REJECT',
+                       'TAKE_PROFIT_ORDER_REJECT',
+                       'STOP_LOSS_ORDER_REJECT',
+                       'TRAILING_STOP_LOSS_ORDER_REJECT']
+    # transactions which can be ignored
+    _X_IGNORE_TRANS = ['DAILY_FINANCING',
+                       'CLIENT_CONFIGURE']
 
     # Date format used
     _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000000000Z"
@@ -173,6 +202,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._env = None  # reference to cerebro for general notifications
         self._evt_acct = SerializableEvent()
         self._orders = collections.OrderedDict()  # map order.ref to order id
+        self._trades = collections.OrderedDict()  # map order.ref to trade id
 
         # init oanda v20 api context
         self.oapi = v20.Context(
@@ -465,13 +495,28 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 okwargs['gtdTime'] = gtdtime.strftime(self._DATE_FORMAT)
 
         if order.exectype == bt.Order.StopLimit:
-            okwargs['priceBound'] = order.created.pricelimit
+            # TODO should use plimit param
+            if "oref" not in kwargs:
+                raise Exception("oref needed for StopLimit order")
+            ''' 
+                - pricelimit: holds pricelimit for StopLimit(which has trigger first)
+            #okwargs['priceBound'] = order.created.pricelimit
+            - ``Order.StopLimit``. An order which is triggered at ``price`` and
+              executed as an implicit *Limit* order with price given by
+              ``pricelimit``
+            '''
 
         if order.exectype == bt.Order.StopTrail:
+            # TODO should behave as in comment below
+            '''
+            - ``Order.StopTrail``. An order which is triggered at ``price``
+            minus ``trailamount`` (or ``trailpercent``) and which is updated
+            if the price moves away from the stop'''
             trailamount = order.trailamount
             if "oref" not in kwargs:
                 raise Exception("oref needed for StopTrail order")
             okwargs["clientTradeID"] = self._oref_to_client_id(kwargs["oref"])
+            # TODO check how the trade is set up
             if order.trailpercent:
                 trailamount = order.price * order.trailpercent
             okwargs['distance'] = format(
@@ -625,7 +670,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                             last_id = msg.id
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
-                if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
+                if (self.p.reconnections == 0 or self.p.reconnections > 0 
+                    and reconnections > self.p.reconnections):
                     # unable to reconnect after x times
                     self.put_notification(
                         "Giving up reconnecting streaming events")
@@ -652,12 +698,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             )
             # process response
             for msg_type, msg in response.parts():
-                # FIXME not sure, why the type is either Price or ClientPrice
-                # https://github.com/ftomassetti/backtrader-oandav20/issues/26
-                # there was already a suggestion to change this, but both
-                # msg_types return the price. Check for both msg_types
-                # (Price, ClientPrice) to fetch all streamed prices.
-                if msg_type in ["pricing.Price", "pricing.ClientPrice"]:
+                if msg_type == "pricing.ClientPrice":
                     # put price into queue as dict
                     q.put(msg.dict())
         except (v20.V20ConnectionError, v20.V20Timeout) as e:
@@ -699,15 +740,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 count += 1
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
-                if self.p.reconnections == 0 or self.p.reconnections > 0 and reconnections > self.p.reconnections:
+                if (self.p.reconnections == 0 or self.p.reconnections > 0
+                        and reconnections > self.p.reconnections):
                     self.put_notification("Giving up fetching candles")
                     return
                 reconnections += 1
                 if self.p.reconntimeout is not None:
                     _time.sleep(self.p.reconntimeout)
-                self.put_notification("Trying to fetch candles ({} of {})".format(
-                    reconnections,
-                    self.p.reconnections))
+                self.put_notification(
+                    "Trying to fetch candles ({} of {})".format(
+                        reconnections,
+                        self.p.reconnections))
                 continue
             except Exception as e:
                 self.put_notification(
@@ -739,29 +782,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         q.put({})  # end of transmission'''
 
-    # transactions which will be emitted on creating/accepting a order
-    _X_CREATE_TRANS = ['MARKET_ORDER',
-                       'LIMIT_ORDER',
-                       'STOP_ORDER',
-                       'TAKE_PROFIT_ORDER',
-                       'STOP_LOSS_ORDER',
-                       'TRAILING_STOP_LOSS_ORDER']
-    # transactions which filled orders
-    _X_FILL_TRANS = ['ORDER_FILL']
-    # transactions which cancelled orders
-    _X_CANCEL_TRANS = ['ORDER_CANCEL']
-    # transactions which were rejected
-    _X_REJECT_TRANS = ['MARKET_ORDER_REJECT',
-                       'LIMIT_ORDER_REJECT',
-                       'STOP_ORDER_REJECT',
-                       'TAKE_PROFIT_ORDER_REJECT',
-                       'STOP_LOSS_ORDER_REJECT',
-                       'TRAILING_STOP_LOSS_ORDER_REJECT']
-    # transactions which can be ignored
-    _X_IGNORE_TRANS = ['DAILY_FINANCING',
-                       'CLIENT_CONFIGURE']
-
     def _transaction(self, trans):
+        if self.p.notif_transactions:
+            self.put_notification(str(trans))
         oid = None
         ttype = trans['type']
 
@@ -769,7 +792,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # get order id (matches transaction id)
             oid = trans['id']
             oref = None
-            # identify backtrader order by checking client extensions (this is used when creating a order)
+            # identify backtrader order by checking client
+            # extensions (this is set when creating a order)
             if 'clientExtensions' in trans:
                 # assume backtrader created the order for this transaction
                 oref = self._client_id_to_oref(trans['clientExtensions']['id'])
@@ -803,6 +827,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         if oid in self._orders:
             # when an order id exists process transaction
             self._process_transaction(oid, trans)
+            self._process_closed_trades(trans)
         else:
             # external order created this transaction
             if self.broker.p.use_positions and ttype in self._X_FILL_TRANS:
@@ -820,6 +845,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     msg = 'Received external transaction {} with id {}. Positions and trades may not match anymore.'
                 msg = msg.format(ttype, trans['id'])
                 self.put_notification(msg, trans)
+            # check external transactions for trades closed
+            self._process_closed_trades(trans)
 
     def _process_transaction(self, oid, trans):
         try:
@@ -837,9 +864,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             size = float(trans['units'])
             price = float(trans['price'])
             self.broker._fill(oref, size, price, reason=trans['reason'])
-            # store trade ids which were touched by the order
+            # store order ids which generated by the order
             if 'tradeOpened' in trans:
                 self._orders[trans['tradeOpened']['tradeID']] = oref
+                # store created trade ids
+                self._trades[trans['tradeOpened']['tradeID']] = oref
             if 'tradeReduced' in trans:
                 self._orders[trans['tradeReduced']['tradeID']] = oref
 
@@ -852,6 +881,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
         elif ttype in self._X_REJECT_TRANS:
             self.broker._reject(oref)
+
+    def _process_closed_trades(self, trans):
+        if 'tradesClosed' in trans:
+            for t in trans['tradesClosed']:
+                if t['tradeID'] in self._trades:
+                    del self._trades[t['tradeID']]
 
     def _t_order_create(self):
         while True:
