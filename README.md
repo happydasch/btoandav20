@@ -73,7 +73,7 @@ stopexec: bt.Order.StopTrail
 
 orderexec: bt.Order.Stop
 
-stopexec: bt.Order.StopLimit
+limitexec: bt.Order.StopLimit
 
 
 ### StopTrailLimit order
@@ -90,7 +90,7 @@ The stopside will be filled, when the parent order gets filled.
 
 ### Changing StopTrail, StopLimit or StopTrailLimit order
 
-To change a StopTrail, StopLimit or StopTrailLimit order the stopside needs to be canceled and a new order with the order type StopTrail or StopLimit needs to be created.
+To change a StopTrail, StopLimit or StopTrailLimit order the stopside or takeside needs to be canceled and a new order with the order type StopTrail or StopLimit needs to be created.
 
 Also an oref of the original order needs to be provided, when creating this order.
 The order needs to go into the opposing direction.
@@ -99,27 +99,34 @@ The order needs to go into the opposing direction.
 
 *Create StopLimit order*
 
-- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopLimit, limitexec=None)
+Provide the stoplimit in limitprice or limitargs with plimit
+
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, limitexec=bt.Order.StopLimit, stopexec=None)
 
 *Create new limit for parent order*
 
-- self.sell(exectype=bt.Order.StopLimit, replace=olimit.ref)
+- self.sell(exectype=bt.Order.StopLimit, plimit=xxx or price=yyy, replace=olimit.ref)
 
 
 **StopTrail example:**
 
 *Create StopTrail order*
 
-- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=None)
+Provide the stoptrail in stopargs with trailamount or trailpercent,
+
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, stopargs={"trailamount": xxx or "trailpercent": yyy} limitexec=None)
 
 *Create new trailing stop for parent order*
 
-- self.sell(exectype=bt.Order.StopTrail, replace=ostop.ref)
+- self.sell(exectype=bt.Order.StopTrail, trailamount=xxx or trailpercent=yyy, replace=ostop.ref)
 
 
 **StopTrailLimit example:**
 
 *Create StopTrailLimit order*
+
+Provide the stoptrail in stopargs with trailamount or trailpercent,
+Provide the stoplimit in limitprice or limitargs with plimit
 
 - o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Order.StopLimit)
 
@@ -129,7 +136,7 @@ The order needs to go into the opposing direction.
 
 *Change limit side*
 
-- self.sell(exectype=bt.Order.StopLimit, replace=olimit.ref)
+- self.sell(exectype=bt.Order.StopLimit, plimit=xxx or price=yyy, replace=olimit.ref)
 
 
 ## Dependencies
