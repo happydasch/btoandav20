@@ -8,9 +8,9 @@ https://www1.oanda.com/lang/en/forex-trading/analysis/currency-units-calculator
 
 class ForexSizer(bt.Sizer):
 
-    params = (
-        ('percents', 0),   # percents of cash
-        ('amount', 0),  # amount of cash
+    params = dict(
+        percents=0,   # percents of cash
+        amount=0,     # amount of cash
     )
 
     def _getsizing(self, comminfo, cash, data, isbuy):
@@ -31,24 +31,24 @@ class ForexSizer(bt.Sizer):
 
 class ForexPercentSizer(ForexSizer):
 
-    params = (
-        ('percents', 5),
+    params = dict(
+        percents=5,
     )
 
 
 class ForexCashSizer(ForexSizer):
 
-    params = (
-        ('amount', 50),
+    params = dict(
+        amount=50,
     )
 
 
 class ForexRiskSizer(bt.Sizer):
 
-    params = (
-        ('percents', 0),   # risk percents
-        ('amount', 0),     # risk amount
-        ('stoploss', 5),  # stop loss in pips
+    params = dict(
+        percents=0,   # risk percents
+        amount=0,     # risk amount
+        stoploss=5,   # stop loss in pips
     )
 
     def getsizing(self, data, isbuy, stoploss=None):
@@ -81,13 +81,13 @@ class ForexRiskSizer(bt.Sizer):
 
 class ForexRiskPercentSizer(ForexRiskSizer):
 
-    params = (
-        ('percents', 5),
+    params = dict(
+        percents=5,
     )
 
 
 class ForexRiskCashSizer(ForexRiskSizer):
 
-    params = (
-        ('amount', 50),
+    params = dict(
+        amount=50,
     )

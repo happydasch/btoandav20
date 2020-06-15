@@ -7,9 +7,9 @@ from btoandav20.stores import oandav20store
 
 class OandaV20Sizer(bt.Sizer):
 
-    params = (
-        ('percents', 0),   # percents of cash
-        ('amount', 0),     # fixed amount
+    params = dict(
+        percents=0,   # percents of cash
+        amount=0,     # fixed amount
     )
 
     def __init__(self, **kwargs):
@@ -40,24 +40,24 @@ class OandaV20Sizer(bt.Sizer):
 
 class OandaV20PercentSizer(OandaV20Sizer):
 
-    params = (
-        ('percents', 5),
+    params = dict(
+        percents=5,
     )
 
 
 class OandaV20CashSizer(OandaV20Sizer):
 
-    params = (
-        ('amount', 50),
+    params = dict(
+        amount=50,
     )
 
 
 class OandaV20RiskSizer(bt.Sizer):
 
-    params = (
-        ('percents', 0),   # risk percents
-        ('amount', 0),     # risk amount
-        ('stoploss', 10),  # stop loss in pips
+    params = dict(
+        percents=0,   # risk percents
+        amount=0,     # risk amount
+        stoploss=10,  # stop loss in pips
     )
 
     def __init__(self, **kwargs):
@@ -118,13 +118,13 @@ class OandaV20RiskSizer(bt.Sizer):
 
 class OandaV20RiskPercentSizer(OandaV20RiskSizer):
 
-    params = (
-        ('percents', 5),
+    params = dict(
+        percents=5,
     )
 
 
 class OandaV20RiskCashSizer(OandaV20RiskSizer):
 
-    params = (
-        ('amount', 50),
+    params = dict(
+        amount=50,
     )

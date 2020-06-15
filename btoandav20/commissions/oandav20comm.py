@@ -2,15 +2,16 @@ from backtrader.comminfo import CommInfoBase
 
 
 class OandaV20CommInfoBacktest(CommInfoBase):
-    params = (
-        ('spread', 2.0),
-        ('stocklike', False),
-        ('pip_location', -4),
-        ('acc_counter_currency', True),
-        ('automargin', 1.00),
-        ('leverage', 1),
-        ('mult', 1),
-        ('commtype', CommInfoBase.COMM_FIXED),
+
+    params = dict(
+        spread=2.0,
+        stocklike=False,
+        pip_location=-4,
+        acc_counter_currency=True,
+        automargin=1.00,
+        leverage=1,
+        mult=1,
+        commtype=CommInfoBase.COMM_FIXED,
     )
 
     def getvaluesize(self, size, price):
