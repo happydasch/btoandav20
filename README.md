@@ -30,6 +30,7 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 * Streaming events
 * Get *unlimited* history prices for backtesting
 * Replay functionality for backtesting
+* Replace pending orders
 
 * **Support different type of orders:**
     * Order.Market
