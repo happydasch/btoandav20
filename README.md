@@ -8,7 +8,6 @@ Support for Oanda-V20 API in backtrader
 **We are looking for contributors: if you are interested to join us please contact us**
 
 
-
 ## What is it ?
 
 **backtrader-oandav20** is a package to integrate OANDA into [backtrader](https://www.backtrader.com/).
@@ -32,28 +31,91 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 * Get *unlimited* history prices for backtesting
 * Replay functionality for backtesting
 
-* Support different type of orders:
+* **Support different type of orders:**
     * Order.Market
     * Order.Limit
     * Order.Stop
-    * Order.StopLimit (using Stop and upperBound / lowerBound prices) *may not be possible*
-  * Order.StopTrail (will only work in buy and sell brackets)
-  * Bracket orders are supported by using the takeprofit and stoploss order members and creating internally simulated orders.
+    * Order.StopLimit (by using brackets)
+    * Order.StopTrail (by using brackets)
+    * Order.StopTrailLimit (by using brackets)
+    * Bracket orders are supported by using the takeprofit and stoploss order members and creating internally simulated orders.
 
-* 4 different OandaV20 Sizers:
+* **4 different OandaV20 Sizers:**
     * OandaV20PercentSizer - returns position size which matches the percent amount of total cash
     * OandaV20CashSizer - return position size which matches the cash amount
     * OandaV20RiskPercentSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
-    * OandaV20RiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
+    * OandaV2
+    0RiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
 
-* 4 different Forex Sizers:
+* **4 different Forex Sizers:**
     * ForexPercentSizer - returns position size which matches the percent amount of total cash
     * ForexCashSizer - return position size which matches the cash amount
     * ForexRiskPercentSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
     * ForexRiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
-* Possibility to load existing positions from the OANDA account
-* Reconnects on broken connections and after timeouts, also backfills data after a timeout or disconnect occurred
+    * Possibility to load existing positions from the OANDA account
+    * Reconnects on broken connections and after timeouts, also backfills data after a timeout or disconnect occurred
 
+
+## Order Types
+
+btoandav20 supports MARKET, LIMIT and STOP orders. Other order types, like StopTrail, StopLimit need to be created using brackets.
+
+
+### StopTrail order
+
+orderexec: bt.Order.Stop,
+
+stopexec: bt.Order.StopTrail
+
+
+### StopLimit order
+
+orderexec: bt.Order.Stop,
+
+limitexec: bt.Order.Limit
+
+The stopside and limitside will be filled, when the parent order gets filled.
+
+
+### Changing StopTrail, StopLimit or StopTrailLimit order
+
+To change a StopTrail, StopLimit or StopTrailLimit order the stopside or limitside needs to be canceled and a new order with the order type StopTrail or StopLimit needs to be created.
+
+Also an oref of the original order needs to be provided, when creating this order.
+The order needs to go into the opposing direction.
+
+**StopLimit example:**
+
+*Create StopLimit order*
+o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, limitexec=bt.Order.Limit, stopexec=None)
+
+*Create new limit for parent order*
+self.cancel(olimit)
+self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
+
+
+**StopTrail example:**
+
+*Create StopTrail order*
+o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=None)
+
+*Create new trailing stop for parent order*
+self.cancel(ostop)
+self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
+
+
+**StopTrailLimit example:**
+
+*Create StopTrailLimit order*
+o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Otder.Limit)
+
+*Change stop side*
+self.cancel(ostop)
+self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
+
+*Change limit side*
+self.cancel(olimit)
+self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
 
 
 ## Dependencies
@@ -62,7 +124,6 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 * ``Backtrader`` (tested with version 1.9.61.122)
 * ``pyyaml`` (tested with version 3.13)
 * ``v20`` (tested with version 3.0.25) (https://github.com/oanda/v20-python/releases)
-
 
 
 ## Installation
@@ -100,12 +161,11 @@ The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 If you encounter an issue during installation, please check this url first: https://community.backtrader.com/topic/1570/oanda-data-feed/ and create a new issue if this doesn't solve it.
 
 
-
 ## Get Started
 See the [example](examples/oandav20test) folder for more detailed explanation on how to use it.
-
 
 
 ## License
 
 All code is based on backtrader oandastore which is released under GNU General Public License Version 3 by Daniel Rodriguez
+
