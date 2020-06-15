@@ -59,21 +59,31 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 
 ## Order Types
 
-btoandav20 supports MARKET, LIMIT and STOP orders. Other order types, like StopTrail, StopLimit need to be created using brackets.
+btoandav20 supports MARKET, LIMIT and STOP orders. Other order types, like StopTrail, StopLimit or StopTrailLimit need to be created using brackets.
 
 
 ### StopTrail order
 
-orderexec: bt.Order.Stop,
+orderexec: bt.Order.Stop
 
 stopexec: bt.Order.StopTrail
 
 
 ### StopLimit order
 
-orderexec: bt.Order.Stop,
+orderexec: bt.Order.Stop
 
 stopexec: bt.Order.StopLimit
+
+
+### StopTrailLimit order
+
+orderexec: bt.Order.Stop
+
+stopexec: bt.Order.StopTrail
+
+limitexec: bt.Order.StopLimit
+
 
 The stopside will be filled, when the parent order gets filled.
 
