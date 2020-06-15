@@ -92,41 +92,37 @@ o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, limitexec=bt.Order.Limit,
 
 *Create new limit for parent order*
 
-self.cancel(olimit)
-
-self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
+- self.cancel(olimit)
+- self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
 
 
 **StopTrail example:**
 
 *Create StopTrail order*
 
-o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=None)
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=None)
 
 *Create new trailing stop for parent order*
 
-self.cancel(ostop)
-
-self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
+- self.cancel(ostop)
+- self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
 
 
 **StopTrailLimit example:**
 
 *Create StopTrailLimit order*
 
-o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Otder.Limit)
+- o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Otder.Limit)
 
 *Change stop side*
 
-self.cancel(ostop)
-
-self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
+- self.cancel(ostop)
+- self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
 
 *Change limit side*
 
-self.cancel(olimit)
-
-self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
+- self.cancel(olimit)
+- self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
 
 
 ## Dependencies
