@@ -92,8 +92,7 @@ The order needs to go into the opposing direction.
 
 *Create new limit for parent order*
 
-- self.cancel(olimit)
-- self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
+- self.sell(exectype=bt.Order.StopLimit, replace=olimit.ref)
 
 
 **StopTrail example:**
@@ -104,8 +103,7 @@ The order needs to go into the opposing direction.
 
 *Create new trailing stop for parent order*
 
-- self.cancel(ostop)
-- self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
+- self.sell(exectype=bt.Order.StopTrail, replace=ostop.ref)
 
 
 **StopTrailLimit example:**
@@ -116,13 +114,12 @@ The order needs to go into the opposing direction.
 
 *Change stop side*
 
-- self.cancel(ostop)
-- self.sell(exectype=bt.Order.StopTrail, oref=o.ref)
+- self.sell(exectype=bt.Order.StopTrail, replace=ostop.ref)
 
 *Change limit side*
 
 - self.cancel(olimit)
-- self.sell(exectype=bt.Order.StopLimit, oref=o.ref)
+- self.sell(exectype=bt.Order.StopLimit, replace=olimit.ref)
 
 
 ## Dependencies

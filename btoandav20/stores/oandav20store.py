@@ -482,6 +482,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             abs(int(order.created.size)) if order.isbuy()
             else -abs(int(order.created.size)))  # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
+        okwargs['replace'] = kwargs.get("replace", None)
 
         if order.exectype != bt.Order.Market:
             okwargs['price'] = format(
@@ -495,28 +496,16 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 okwargs['gtdTime'] = gtdtime.strftime(self._DATE_FORMAT)
 
         if order.exectype == bt.Order.StopLimit:
-            # TODO should use plimit param
-            if "oref" not in kwargs:
-                raise Exception("oref needed for StopLimit order")
-            ''' 
-                - pricelimit: holds pricelimit for StopLimit(which has trigger first)
-            #okwargs['priceBound'] = order.created.pricelimit
-            - ``Order.StopLimit``. An order which is triggered at ``price`` and
-              executed as an implicit *Limit* order with price given by
-              ``pricelimit``
-            '''
+            if "replace" not in okwargs:
+                raise Exception("replace needed for StopLimit order")
+            okwargs['price'] = format(
+                order.created.price,
+                '.%df' % order.data.contractdetails['displayPrecision'])
 
         if order.exectype == bt.Order.StopTrail:
-            # TODO should behave as in comment below
-            '''
-            - ``Order.StopTrail``. An order which is triggered at ``price``
-            minus ``trailamount`` (or ``trailpercent``) and which is updated
-            if the price moves away from the stop'''
+            if "replace" not in okwargs:
+                raise Exception("replace needed for StopTrail order")
             trailamount = order.trailamount
-            if "oref" not in kwargs:
-                raise Exception("oref needed for StopTrail order")
-            okwargs["clientTradeID"] = self._oref_to_client_id(kwargs["oref"])
-            # TODO check how the trade is set up
             if order.trailpercent:
                 trailamount = order.price * order.trailpercent
             okwargs['distance'] = format(
@@ -896,9 +885,16 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             oref, okwargs = msg
             try:
-                response = self.oapi.order.create(
-                    self.p.account,
-                    order=okwargs)
+                if okwargs["replace"]:
+                    oid = "@{}".format(self._oref_to_client_id(okwargs["replace"]))
+                    response = self.oapi.order.replace(
+                        self.p.account,
+                        oid,
+                        order=okwargs)
+                else:
+                    response = self.oapi.order.create(
+                        self.p.account,
+                        order=okwargs)
                 # get the transaction which created the order
                 o = response.get("orderCreateTransaction", 201)
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
