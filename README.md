@@ -119,7 +119,6 @@ The order needs to go into the opposing direction.
 
 *Change limit side*
 
-- self.cancel(olimit)
 - self.sell(exectype=bt.Order.StopLimit, replace=olimit.ref)
 
 
