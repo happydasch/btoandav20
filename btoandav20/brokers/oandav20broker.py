@@ -268,12 +268,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
                     pending.append(None)
                 parent, child = pending
                 # set takeside and stopside
-                if order.exectype == order.StopTrail:
+                if order.exectype in [order.StopTrail, order.Stop]:
                     stopside = order
                     takeside = child
-                elif order.exectype == order.StopLimit:
-                    takeside = order
-                    stopside = child
                 else:
                     takeside = order
                     stopside = child
