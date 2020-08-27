@@ -872,9 +872,11 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._trades[oref] = trans['tradeID']
         if 'tradeOpened' in trans:
             self._trades[oref] = trans['tradeOpened']['tradeID']
+        if 'tradeClosed' in trans:
+            self._trades[oref] = trans['tradeClosed']['tradeID']
         if 'tradesClosed' in trans:
             for t in trans['tradesClosed']:
-                for key, value in self._trades.items():
+                for key, value in self._trades.copy().items():
                     if value == t['tradeID']:
                         del self._trades[key]
 
@@ -943,8 +945,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _create_error_notif(self, e, response):
         try:
-            notif = "{}: {}".format(
-                response.get("errorCode"),
+            notif = "{}: {} - {}".format(
+                response.status,
+                response.reason,
                 response.get("errorMessage"))
         except Exception:
             notif = str(e)
