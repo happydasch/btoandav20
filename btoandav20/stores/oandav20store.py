@@ -83,6 +83,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
      - ``reconntimeout`` (default: ``5.0``): how long to wait to reconnect
          stream (feeds have own reconnection settings)
+
+     - ``notif_transactions`` (default: ``False``): notify store of all recieved
+         transactions
     '''
 
     params = dict(
