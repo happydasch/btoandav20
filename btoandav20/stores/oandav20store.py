@@ -643,9 +643,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 )
                 # process response
                 for msg_type, msg in response.parts():
-                    # if a connection occurred
+                    if msg_type == "transaction.TransactionHeartbeat":
+                        if not last_id:
+                            last_id = msg.lastTransactionID
+                    # if a reconnection occurred
                     if reconnections > 0:
-                        if reconnections > 0 and last_id:
+                        if last_id:
                             # get all transactions between the last seen and first from
                             # reconnected stream
                             old_transactions = self.get_transactions_since(
@@ -660,6 +663,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         if not last_id or msg.id > last_id:
                             self._transaction(msg.dict())
                             last_id = msg.id
+
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
                 if (self.p.reconnections == 0 or self.p.reconnections > 0 
