@@ -75,7 +75,6 @@ class ForexRiskSizer(bt.Sizer):
             cash_to_use = self.p.amount
         price_per_pip = cash_to_use / stoploss
         size = price_per_pip * (avail / cash)
-        size *= comminfo.get_leverage()
         return int(size)
 
 
