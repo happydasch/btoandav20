@@ -169,7 +169,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'CLIENT_CONFIGURE']
 
     # Date format used
-    _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000000000Z"
+    _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f000Z"
 
     # Oanda api endpoints
     _OAPI_URL = ["api-fxtrade.oanda.com",
@@ -666,8 +666,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
-                if (self.p.reconnections == 0 or self.p.reconnections > 0 
-                    and reconnections > self.p.reconnections):
+                if (self.p.reconnections == 0 or self.p.reconnections > 0
+                        and reconnections > self.p.reconnections):
                     # unable to reconnect after x times
                     self.put_notification(
                         "Giving up reconnecting streaming events")
