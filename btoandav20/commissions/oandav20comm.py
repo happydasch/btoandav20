@@ -1,27 +1,18 @@
 from backtrader.comminfo import CommInfoBase
 
 
-class OandaV20CommInfoBacktest(CommInfoBase):
+class OandaV20BacktestCommInfo(CommInfoBase):
 
     params = dict(
         spread=2.0,
-        stocklike=False,
-        pip_location=-4,
         acc_counter_currency=True,
-        automargin=1.00,
-        leverage=1,
-        mult=1,
+        pip_location=-4,
+        automargin=False,
+        margin=0.05,
+        leverage=20.0,
+        stocklike=False,
         commtype=CommInfoBase.COMM_FIXED,
     )
-
-    def getvaluesize(self, size, price):
-        # In real life the margin approaches the price
-        return abs(size) * price
-
-    def getoperationcost(self, size, price):
-        '''Returns the needed amount of cash an operation would cost'''
-        # Same reasoning as above
-        return abs(size) * price
 
     def _getcommission(self, size, price, pseudoexec):
         '''
@@ -30,5 +21,8 @@ class OandaV20CommInfoBacktest(CommInfoBase):
         https://community.backtrader.com/topic/525/forex-commission-scheme
         '''
         multiplier = float(10 ** self.p.pip_location)
-        comm = abs((self.p.spread * ((size / price) * multiplier)/2))
+        if self.p.acc_counter_currency:
+            comm = abs((self.p.spread * (size * multiplier)/2))
+        else:
+            comm = abs((self.p.spread * ((size / price) * multiplier)/2))
         return comm
