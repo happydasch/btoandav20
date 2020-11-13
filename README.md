@@ -26,6 +26,8 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
 * Get *unlimited* history prices for backtesting
 * Replay functionality for backtesting
 * Replace pending orders
+* Possibility to load existing positions from the OANDA account
+* Reconnects on broken connections and after timeouts, also backfills data after a timeout or disconnect occurred
 
 * **Support different type of orders:**
   * Order.Market
@@ -43,13 +45,9 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
   * OandaV2
   0RiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
 
-* **4 different Forex Sizers:**
-  * ForexPercentSizer - returns position size which matches the percent amount of total cash
-  * ForexCashSizer - return position size which matches the cash amount
-  * ForexRiskPercentSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
-  * ForexRiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
-  * Possibility to load existing positions from the OANDA account
-  * Reconnects on broken connections and after timeouts, also backfills data after a timeout or disconnect occurred
+* **2 different backtest Sizers:**
+  * OandaV20BacktestRiskPercentSizer - returns position size which matches the total risk in percent of total amount (max pips)
+  * OandaV20BacktestRiskCashSizer - returns position size which matches the total risk in percent of total amount (max pips)
 
 ## Order Types
 
