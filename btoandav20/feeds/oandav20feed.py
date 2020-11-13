@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 
 import time as _time
 import threading
@@ -88,6 +88,12 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         Return candles instead of streaming for current data, granularity
         needs to be higher than Ticks
 
+      - ``adjstarttime`` (default: ``False``)
+
+        Allows to adjust the start time of a candle to the end of the
+        candles period. This only affects backfill data and live data
+        if candles=True
+
 
     This data feed supports only this mapping of ``timeframe`` and
     ``compression``, which comply with the definitions in the OANDA API
@@ -126,6 +132,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         bidask=True,
         useask=False,
         candles=False,
+        adjstarttime=False,   # adjust start time of candle
         # TODO readd tmout - set timeout in store
         reconnect=True,
         reconnections=-1,     # forever
@@ -274,9 +281,14 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 _time.sleep(tmout)
 
     def _getstarttime(self, timeframe, compression, dt=None, offset=0):
-        '''This method will return the start of the period based on current
-        time (or provided time). It is using UTC 22:00 (5:00 pm New York)
-        as the start of the day.'''
+        '''
+        This method will return the start of the period based on current
+        time (or provided time).
+        '''
+        sessionstart = self.p.sessionstart
+        if sessionstart is None:
+            # use UTC 22:00 (5:00 pm New York) as default
+            sessionstart = time(hour=22, minute=0, second=0)
         if dt is None:
             dt = datetime.utcnow()
         if timeframe == TimeFrame.Seconds:
@@ -305,21 +317,26 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             if offset:
                 dt = dt - timedelta(minutes=compression*offset)
         elif timeframe == TimeFrame.Days:
-            # TODO use sessionstart if available, else use 0
-            # start of day is UTC 22 (5pm new york)
-            if dt.hour < 22:
+            if dt.hour < sessionstart.hour:
                 dt = dt - timedelta(days=1)
             if offset:
                 dt = dt - timedelta(days=offset)
-            dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
+            dt = dt.replace(
+                hour=sessionstart.hour,
+                minute=sessionstart.minute,
+                second=sessionstart.second,
+                microsecond=sessionstart.microsecond)
         elif timeframe == TimeFrame.Weeks:
             if dt.weekday() != 6:
                 # sunday is start of week at 5pm new york
                 dt = dt - timedelta(days=dt.weekday() + 1)
             if offset:
                 dt = dt - timedelta(days=offset * 7)
-            # TODO use sessionstart if available, else use 0
-            dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
+            dt = dt.replace(
+                hour=sessionstart.hour,
+                minute=sessionstart.minute,
+                second=sessionstart.second,
+                microsecond=sessionstart.microsecond)
         elif timeframe == TimeFrame.Months:
             if offset:
                 dt = dt - timedelta(days=(min(28 + dt.day, 31)))
@@ -331,12 +348,17 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
             # start of month (1 at 0, 22 last day of prev month)
             if dt.day < last_day_of_month:
                 dt = dt - timedelta(days=dt.day)
-            # TODO use sessionstart if available, else use 0
-            dt = dt.replace(hour=22, minute=0, second=0, microsecond=0)
+            dt = dt.replace(
+                hour=sessionstart.hour,
+                minute=sessionstart.minute,
+                second=sessionstart.second,
+                microsecond=sessionstart.microsecond)
         return dt
 
     def stop(self):
-        '''Stops and tells the store to stop'''
+        '''
+        Stops and tells the store to stop
+        '''
         super(OandaV20Data, self).stop()
         self.o.stop()
 
@@ -517,6 +539,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
     def _load_candle(self, msg):
         dtobj = datetime.utcfromtimestamp(float(msg['time']))
+        if self.p.adjstarttime:
+            dtobj = self._getstarttime(
+                self.p.timeframe, self.p.compression, dtobj, -1)
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:
             return False  # time already seen
@@ -529,19 +554,20 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         # Put the prices into the bar
         if self.p.bidask:
             if not self.p.useask:
-                self.lines.open[0] = float(msg['bid']['o'])
-                self.lines.high[0] = float(msg['bid']['h'])
-                self.lines.low[0] = float(msg['bid']['l'])
-                self.lines.close[0] = float(msg['bid']['c'])
+                o_price, h_price, l_price, c_price = (
+                    msg['bid']['o'], msg['bid']['h'],
+                    msg['bid']['l'], msg['bid']['c'])
             else:
-                self.lines.open[0] = float(msg['ask']['o'])
-                self.lines.high[0] = float(msg['ask']['h'])
-                self.lines.low[0] = float(msg['ask']['l'])
-                self.lines.close[0] = float(msg['ask']['c'])
+                o_price, h_price, l_price, c_price = (
+                    msg['ask']['o'], msg['ask']['h'],
+                    msg['ask']['l'], msg['ask']['c'])
         else:
-            self.lines.open[0] = float(msg['mid']['o'])
-            self.lines.high[0] = float(msg['mid']['h'])
-            self.lines.low[0] = float(msg['mid']['l'])
-            self.lines.close[0] = float(msg['mid']['c'])
+            o_price, h_price, l_price, c_price = (
+                msg['mid']['o'], msg['mid']['h'],
+                msg['mid']['l'], msg['mid']['c'])
+        self.lines.open[0] = float(o_price)
+        self.lines.high[0] = float(h_price)
+        self.lines.low[0] = float(l_price)
+        self.lines.close[0] = float(c_price)
 
         return True
