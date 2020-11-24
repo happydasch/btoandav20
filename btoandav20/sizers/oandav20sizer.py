@@ -10,6 +10,7 @@ class OandaV20Sizer(bt.Sizer):
     params = dict(
         percents=0,   # percents of cash
         amount=0,     # fixed amount
+        avail_reduce_perc=0,
     )
 
     def __init__(self, **kwargs):
@@ -29,6 +30,8 @@ class OandaV20Sizer(bt.Sizer):
                 avail = float(price['unitsAvailable']['default']['long'])
             else:
                 avail = float(price['unitsAvailable']['default']['short'])
+        if self.p.avail_reduce_perc > 0:
+            avail -= avail/100 * self.p.avail_reduce_perc
         if self.p.percents != 0:
             size = avail * (self.p.percents / 100)
         elif self.p.amount != 0:
@@ -58,6 +61,7 @@ class OandaV20RiskSizer(bt.Sizer):
         percents=0,   # risk percents
         amount=0,     # risk amount
         stoploss=10,  # stop loss in pips
+        avail_reduce_perc=0,
     )
 
     def __init__(self, **kwargs):
@@ -87,31 +91,33 @@ class OandaV20RiskSizer(bt.Sizer):
 
         cash_to_use = 0
         if self.p.percents != 0:
-            cash_to_use = cash * (self.p.percents / 100)
+            cash_to_use = cash * (self.p.percents/100)
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
 
+        price = self.o.get_pricing(name)
+        if not price:
+            return 0
         if sym_src != sym_to:
             # convert cash to target currency
-            price = self.o.get_pricing(sym_src + '_' + sym_to)
-            if price is not None:
-                cash_to_use = cash_to_use / (1 / float(price['closeoutAsk']))
+            convprice = self.o.get_pricing(sym_src + '_' + sym_to)
+            if convprice:
+                cash_to_use = cash_to_use / (1/float(convprice['closeoutAsk']))
 
-        size = 0
         price_per_pip = cash_to_use / stoploss
-        price = self.o.get_pricing(name)
-        if price is not None:
-            size = (
-                price_per_pip
-                * (1 / 10 ** data.contractdetails['pipLocation']))
-            if isbuy:
-                size = min(
-                    size,
-                    float(price['unitsAvailable']['default']['long']))
-            else:
-                size = min(
-                    size,
-                    float(price['unitsAvailable']['default']['short']))
+        mult = float(1/10 ** data.contractdetails['pipLocation'])
+        size = price_per_pip * mult
+
+        if isbuy:
+            avail = float(price['unitsAvailable']['default']['long'])
+        else:
+            avail = float(price['unitsAvailable']['default']['short'])
+        if self.p.avail_reduce_perc > 0:
+            avail -= avail/100 * self.p.avail_reduce_perc
+        if isbuy:
+            size = min(size, avail)
+        else:
+            size = min(size, avail)
 
         return int(size)
 

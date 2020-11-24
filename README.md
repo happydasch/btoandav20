@@ -33,9 +33,7 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
   * Order.Market
   * Order.Limit
   * Order.Stop
-  * Order.StopLimit (by using brackets)
   * Order.StopTrail (by using brackets)
-  * Order.StopTrailLimit (by using brackets)
   * Bracket orders are supported by using the takeprofit and stoploss order members and creating internally simulated orders.
 
 * **4 different OandaV20 Sizers:**
@@ -45,13 +43,15 @@ We highly recommend to have a specific account to use backtrader with OANDA. You
   * OandaV2
   0RiskCashSizer - returns position size which matches the total risk in percent of total amount (max stop loss)
 
-* **2 different backtest Sizers:**
+* **4 different backtest Sizers:**
+  * OandaV20BacktestPercentSizer - returns position size which matches the percent amount of total cash
+  * OandaV20BacktestCashSizer - return position size which matches the cash amount
   * OandaV20BacktestRiskPercentSizer - returns position size which matches the total risk in percent of total amount (max pips)
   * OandaV20BacktestRiskCashSizer - returns position size which matches the total risk in percent of total amount (max pips)
 
 ## Order Types
 
-btoandav20 supports MARKET, LIMIT and STOP orders. Other order types, like StopTrail, StopLimit or StopTrailLimit need to be created using brackets.
+btoandav20 supports Market, Limit and Stop orders. Other order types, like StopTrail need to be created using brackets.
 
 ### StopTrail order
 
@@ -59,38 +59,12 @@ orderexec: bt.Order.Stop
 
 stopexec: bt.Order.StopTrail
 
-### StopLimit order
+### Changing StopTrail order
 
-orderexec: bt.Order.Stop
-
-limitexec: bt.Order.StopLimit
-
-### StopTrailLimit order
-
-orderexec: bt.Order.Stop
-
-stopexec: bt.Order.StopTrail
-
-limitexec: bt.Order.StopLimit
-
-The stopside will be filled, when the parent order gets filled.
-
-### Changing StopTrail, StopLimit or StopTrailLimit order
-
-To change a StopTrail, StopLimit or StopTrailLimit order the stopside or takeside needs to be canceled and a new order with the order type StopTrail or StopLimit needs to be created.
+To change a StopTrail order the stopside or takeside needs to be canceled and a new order with the order type StopTrail needs to be created.
 
 Also an oref of the original order needs to be provided, when creating this order.
 The order needs to go into the opposing direction.
-
-**StopLimit example:**
-
-Provide the stoplimit in limitprice or limitargs with plimit
-
-* o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, limitexec=bt.Order.StopLimit, stopexec=None)
-
-Create new limit for parent order
-
-* self.sell(exectype=bt.Order.StopLimit, plimit=xxx or price=yyy, replace=olimit.ref)
 
 **StopTrail example:**
 
@@ -101,21 +75,6 @@ Provide the stoptrail in stopargs with trailamount or trailpercent
 Create new trailing stop for parent order
 
 * self.sell(exectype=bt.Order.StopTrail, trailamount=xxx or trailpercent=yyy, replace=ostop.ref)
-
-**StopTrailLimit example:**
-
-Provide the stoptrail in stopargs with trailamount or trailpercent,
-Provide the stoplimit in limitprice or limitargs with plimit
-
-* o, ostop, olimit = buy_bracket(exectype=bt.Order.Stop, stopexec=bt.Order.StopTrail, limitexec=bt.Order.StopLimit)
-
-Change stop side
-
-* self.sell(exectype=bt.Order.StopTrail, replace=ostop.ref)
-
-Change limit side
-
-* self.sell(exectype=bt.Order.StopLimit, plimit=xxx or price=yyy, replace=olimit.ref)
 
 ## Dependencies
 

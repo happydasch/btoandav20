@@ -211,7 +211,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
             dtbegin = None
             if self.fromdate > float('-inf'):
-                dtbegin = num2date(self.fromdate)
+                dtbegin = num2date(self.fromdate, tz=timezone.utc)
 
             self.qhist = self.o.candles(
                 self.p.dataname, dtbegin, dtend,
@@ -257,7 +257,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     # len == 1 ... forwarded for the 1st time
                     dtbegin = self.datetime.datetime(-1)
                 elif self.fromdate > float('-inf'):
-                    dtbegin = num2date(self.fromdate)
+                    dtbegin = num2date(self.fromdate, tz=timezone.utc)
                 else:  # 1st bar and no begin set
                     dtbegin = dtstart
                 self.qlive = self.o.candles(
@@ -436,7 +436,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     # len == 1 ... forwarded for the 1st time
                     dtbegin = self.datetime.datetime(-1).astimezone(timezone.utc)
                 elif self.fromdate > float('-inf'):
-                    dtbegin = num2date(self.fromdate)
+                    dtbegin = num2date(self.fromdate, tz=timezone.utc)
                 else:  # 1st bar and no begin set
                     # passing None to fetch max possible in 1 request
                     dtbegin = None

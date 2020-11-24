@@ -5,7 +5,7 @@ import collections
 import threading
 import copy
 import time as _time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import v20
 
@@ -142,7 +142,6 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         bt.Order.Market: 'MARKET',
         bt.Order.Limit: 'LIMIT',
         bt.Order.Stop: 'STOP',
-        bt.Order.StopLimit: 'TAKE_PROFIT',
         bt.Order.StopTrail: 'TRAILING_STOP_LOSS'
     }
 
@@ -152,6 +151,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'STOP_ORDER',
                        'TAKE_PROFIT_ORDER',
                        'STOP_LOSS_ORDER',
+                       'MARKET_IF_TOUCHED_ORDER',
                        'TRAILING_STOP_LOSS_ORDER']
     # transactions which filled orders
     _X_FILL_TRANS = ['ORDER_FILL']
@@ -163,19 +163,20 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                        'STOP_ORDER_REJECT',
                        'TAKE_PROFIT_ORDER_REJECT',
                        'STOP_LOSS_ORDER_REJECT',
+                       'MARKET_IF_TOUCHED_ORDER_REJECT',
                        'TRAILING_STOP_LOSS_ORDER_REJECT']
     # transactions which can be ignored
     _X_IGNORE_TRANS = ['DAILY_FINANCING',
                        'CLIENT_CONFIGURE']
 
     # Date format used
-    _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f000Z"
+    _DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f000Z'
 
     # Oanda api endpoints
-    _OAPI_URL = ["api-fxtrade.oanda.com",
-                 "api-fxpractice.oanda.com"]
-    _OAPI_STREAM_URL = ["stream-fxtrade.oanda.com",
-                        "stream-fxpractice.oanda.com"]
+    _OAPI_URL = ['api-fxtrade.oanda.com',
+                 'api-fxpractice.oanda.com']
+    _OAPI_STREAM_URL = ['stream-fxtrade.oanda.com',
+                        'stream-fxpractice.oanda.com']
 
     @classmethod
     def getdata(cls, *args, **kwargs):
@@ -214,7 +215,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             port=443,
             ssl=True,
             token=self.p.token,
-            datetime_format="UNIX",
+            datetime_format='UNIX',
         )
 
         # init oanda v20 api stream context
@@ -224,7 +225,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             port=443,
             ssl=True,
             token=self.p.token,
-            datetime_format="UNIX",
+            datetime_format='UNIX',
         )
 
     def start(self, data=None, broker=None):
@@ -275,8 +276,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return pos
@@ -302,8 +302,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return inst[0]
@@ -325,8 +324,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return inst
@@ -347,8 +345,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return prices[0]
@@ -369,8 +366,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return prices
@@ -393,8 +389,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return transactions
@@ -414,8 +409,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
         try:
             return transactions
@@ -485,7 +479,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             abs(int(order.created.size)) if order.isbuy()
             else -abs(int(order.created.size)))  # negative for selling
         okwargs['type'] = self._ORDEREXECS[order.exectype]
-        okwargs['replace'] = order.info.get("replace", None)
+        okwargs['replace'] = order.info.get('replace', None)
+        okwargs['replace_type'] = order.info.get('replace_type', None)
 
         if order.exectype != bt.Order.Market:
             okwargs['price'] = format(
@@ -495,19 +490,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 okwargs['timeInForce'] = 'GTC'  # good to cancel
             else:
                 okwargs['timeInForce'] = 'GTD'  # good to date
-                gtdtime = order.data.num2date(order.valid)
+                gtdtime = order.data.num2date(order.valid, tz=timezone.utc)
                 okwargs['gtdTime'] = gtdtime.strftime(self._DATE_FORMAT)
 
-        if order.exectype == bt.Order.StopLimit:
-            if "replace" not in okwargs:
-                raise Exception("replace param needed for StopLimit order")
-            okwargs['price'] = format(
-                order.plimit or order.price,
-                '.%df' % order.data.contractdetails['displayPrecision'])
-
         if order.exectype == bt.Order.StopTrail:
-            if "replace" not in okwargs:
-                raise Exception("replace param needed for StopTrail order")
+            if 'replace' not in okwargs:
+                raise Exception('replace param needed for StopTrail order')
             trailamount = order.trailamount
             if order.trailpercent:
                 trailamount = order.price * order.trailpercent
@@ -585,7 +573,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
     def _oref_to_client_id(self, oref):
         '''Converts a oref to client id'''
-        id = "{}-{}".format(self._client_id_prefix, oref)
+        id = '{}-{}'.format(self._client_id_prefix, oref)
         return id
 
     def _client_id_to_oref(self, client_id):
@@ -611,14 +599,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
                 if self.p.reconnections == 0:
-                    self.put_notification("Giving up fetching account summary")
+                    self.put_notification('Giving up fetching account summary')
                     return
                 continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
-                        e,
-                        response))
+                        e, response))
                 return
 
             try:
@@ -643,7 +630,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 )
                 # process response
                 for msg_type, msg in response.parts():
-                    if msg_type == "transaction.TransactionHeartbeat":
+                    if msg_type == 'transaction.TransactionHeartbeat':
                         if not last_id:
                             last_id = msg.lastTransactionID
                     # if a reconnection occurred
@@ -654,12 +641,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                             old_transactions = self.get_transactions_since(
                                 last_id)
                             for t in old_transactions:
-                                if msg_type == "transaction.Transaction":
+                                if msg_type == 'transaction.Transaction':
                                     if t.id > last_id:
                                         self._transaction(t.dict())
                                         last_id = t.id
                         reconnections = 0
-                    if msg_type == "transaction.Transaction":
+                    if msg_type == 'transaction.Transaction':
                         if not last_id or msg.id > last_id:
                             self._transaction(msg.dict())
                             last_id = msg.id
@@ -669,21 +656,19 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 if (self.p.reconnections == 0 or self.p.reconnections > 0
                         and reconnections > self.p.reconnections):
                     # unable to reconnect after x times
-                    self.put_notification(
-                        "Giving up reconnecting streaming events")
+                    self.put_notification('Giving up reconnecting streaming events')
                     return
                 reconnections += 1
                 if self.p.reconntimeout is not None:
                     _time.sleep(self.p.reconntimeout)
-                self.put_notification("Trying to reconnect streaming events ({} of {})".format(
+                self.put_notification('Trying to reconnect streaming events ({} of {})'.format(
                     reconnections,
                     self.p.reconnections))
                 continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
-                        e,
-                        response))
+                        e, response))
 
     def _t_streaming_prices(self, dataname, q):
         '''Callback method for streaming prices'''
@@ -694,18 +679,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             )
             # process response
             for msg_type, msg in response.parts():
-                if msg_type == "pricing.ClientPrice":
+                if msg_type == 'pricing.ClientPrice':
                     # put price into queue as dict
                     q.put(msg.dict())
         except (v20.V20ConnectionError, v20.V20Timeout) as e:
             self.put_notification(str(e))
             # notify feed of error
-            q.put({"msg": "CONNECTION_ISSUE"})
+            q.put({'msg': 'CONNECTION_ISSUE'})
         except Exception as e:
             self.put_notification(
                 self._create_error_notif(
-                    e,
-                    response))
+                    e, response))
 
     def _t_candles(self, dataname, dtbegin, dtend, timeframe, compression,
                    candleFormat, includeFirst, onlyComplete, q):
@@ -738,21 +722,20 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self.put_notification(str(e))
                 if (self.p.reconnections == 0 or self.p.reconnections > 0
                         and reconnections > self.p.reconnections):
-                    self.put_notification("Giving up fetching candles")
+                    self.put_notification('Giving up fetching candles')
                     return
                 reconnections += 1
                 if self.p.reconntimeout is not None:
                     _time.sleep(self.p.reconntimeout)
                 self.put_notification(
-                    "Trying to fetch candles ({} of {})".format(
+                    'Trying to fetch candles ({} of {})'.format(
                         reconnections,
                         self.p.reconnections))
                 continue
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
-                        e,
-                        response))
+                        e, response))
                 continue
 
             dtobj = None
@@ -895,10 +878,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
 
             oref, okwargs = msg
             try:
-                if okwargs["replace"]:
-                    oid = "@{}".format(self._oref_to_client_id(okwargs["replace"]))
-                    if okwargs["replace"] in self._trades:
-                        okwargs["tradeID"] = self._trades[okwargs["replace"]]
+                if okwargs['replace']:
+                    oid = '@{}'.format(
+                        self._oref_to_client_id(okwargs['replace']))
+                    if okwargs['replace'] in self._trades:
+                        okwargs['tradeID'] = self._trades[okwargs['replace']]
+                    if okwargs['replace_type']:
+                        okwargs['type'] = okwargs['replace_type']
                     response = self.oapi.order.replace(
                         self.p.account,
                         oid,
@@ -908,7 +894,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         self.p.account,
                         order=okwargs)
                 # get the transaction which created the order
-                o = response.get("orderCreateTransaction", 201)
+                o = response.get('orderCreateTransaction', 201)
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
                 self.broker._reject(oref)
@@ -916,8 +902,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
-                        e,
-                        response))
+                        e, response))
                 self.broker._reject(oref)
                 continue
 
@@ -944,18 +929,17 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             except Exception as e:
                 self.put_notification(
                     self._create_error_notif(
-                        e,
-                        response))
+                        e, response))
                 continue
 
             self.broker._cancel(oref)
 
     def _create_error_notif(self, e, response):
         try:
-            notif = "{}: {} - {}".format(
+            notif = '{}: {} - {}'.format(
                 response.status,
                 response.reason,
-                response.get("errorMessage"))
+                response.get('errorMessage'))
         except Exception:
             notif = str(e)
         return notif

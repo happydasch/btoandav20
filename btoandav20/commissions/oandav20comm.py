@@ -4,15 +4,27 @@ from backtrader.comminfo import CommInfoBase
 class OandaV20BacktestCommInfo(CommInfoBase):
 
     params = dict(
-        spread=2.0,
+        spread=0.0,
         acc_counter_currency=True,
         pip_location=-4,
-        automargin=False,
-        margin=0.05,
+        margin=0.5,
         leverage=20.0,
         stocklike=False,
         commtype=CommInfoBase.COMM_FIXED,
     )
+
+    def __init__(self):
+        if self.p.stocklike:
+            raise Exception('Stocklike is not supported')
+        super(OandaV20BacktestCommInfo, self).__init__()
+
+    def getsize(self, price, cash):
+        '''Returns the needed size to meet a cash operation at a given price'''
+        size = super(OandaV20BacktestCommInfo, self).getsize(price, cash)
+        size *= self.p.margin
+        if not self.p.acc_counter_currency:
+            size /= price
+        return int(size)
 
     def _getcommission(self, size, price, pseudoexec):
         '''
@@ -22,7 +34,7 @@ class OandaV20BacktestCommInfo(CommInfoBase):
         '''
         multiplier = float(10 ** self.p.pip_location)
         if self.p.acc_counter_currency:
-            comm = abs((self.p.spread * (size * multiplier)/2))
+            comm = abs((self.p.spread * (size * multiplier) / 2))
         else:
-            comm = abs((self.p.spread * ((size / price) * multiplier)/2))
+            comm = abs((self.p.spread * ((size / price) * multiplier) / 2))
         return comm
