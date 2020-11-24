@@ -34,7 +34,9 @@ class OandaV20BacktestCommInfo(CommInfoBase):
         '''
         multiplier = float(10 ** self.p.pip_location)
         if self.p.acc_counter_currency:
-            comm = abs((self.p.spread * (size * multiplier) / 2))
+            comm = abs(
+                self.p.spread * self.p.margin * (size * multiplier))
         else:
-            comm = abs((self.p.spread * ((size / price) * multiplier) / 2))
-        return comm
+            comm = abs(
+                self.p.spread * self.p.margin * ((size / price) * multiplier))
+        return comm / 2
