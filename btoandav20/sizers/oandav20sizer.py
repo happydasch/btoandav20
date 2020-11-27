@@ -60,7 +60,7 @@ class OandaV20RiskSizer(bt.Sizer):
     params = dict(
         percents=0,   # risk percents
         amount=0,     # risk amount
-        stoploss=10,  # stop loss in pips
+        pips=10,      # stop loss in pips
         avail_reduce_perc=0,
     )
 
@@ -68,18 +68,18 @@ class OandaV20RiskSizer(bt.Sizer):
         super(OandaV20RiskSizer, self).__init__(**kwargs)
         self.o = oandav20store.OandaV20Store(**kwargs)
 
-    def getsizing(self, data, isbuy, stoploss=None):
+    def getsizing(self, data, isbuy, pips=None):
         comminfo = self.broker.getcommissioninfo(data)
         return self._getsizing(
             comminfo,
             self.broker.getcash(),
             data,
             isbuy,
-            stoploss)
+            pips)
 
-    def _getsizing(self, comminfo, cash, data, isbuy, stoploss=None):
-        if not stoploss:
-            stoploss = self.p.stoploss
+    def _getsizing(self, comminfo, cash, data, isbuy, pips=None):
+        if not pips:
+            pips = self.p.pips
         position = self.broker.getposition(data)
         if position:
             return position.size
@@ -104,7 +104,7 @@ class OandaV20RiskSizer(bt.Sizer):
             if convprice:
                 cash_to_use = cash_to_use / (1/float(convprice['closeoutAsk']))
 
-        price_per_pip = cash_to_use / stoploss
+        price_per_pip = cash_to_use / pips
         mult = float(1/10 ** data.contractdetails['pipLocation'])
         size = price_per_pip * mult
 
