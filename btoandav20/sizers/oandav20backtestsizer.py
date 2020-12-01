@@ -68,9 +68,9 @@ class OandaV20BacktestRiskSizer(bt.Sizer):
         price = data.close[0]
         avail = comminfo.getsize(price, cash)
         if self.p.avail_reduce_perc > 0:
-            avail -= avail/100 * self.p.avail_reduce_perc
+            avail -= avail / 100 * self.p.avail_reduce_perc
         if self.p.percents != 0:
-            cash_to_use = cash * (self.p.percents/100)
+            cash_to_use = cash * (self.p.percents / 100)
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
         else:
@@ -78,7 +78,7 @@ class OandaV20BacktestRiskSizer(bt.Sizer):
         if not isinstance(comminfo, OandaV20BacktestCommInfo):
             raise Exception('OandaV20CommInfo required')
 
-        mult = float(1/10 ** comminfo.p.pip_location)
+        mult = float(1 / 10 ** comminfo.p.pip_location)
         price_per_pip = cash_to_use / pips
         if not comminfo.p.acc_counter_currency and price:
             # Acc currency is same as base currency
