@@ -540,8 +540,14 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
     def _load_candle(self, msg):
         dtobj = datetime.utcfromtimestamp(float(msg['time']))
         if self.p.adjstarttime:
+            # move time to start time of next candle
+            # and subtract 0.1 miliseconds (ensures no
+            # rounding issues, 10 microseconds is minimum)
             dtobj = self._getstarttime(
-                self.p.timeframe, self.p.compression, dtobj, -1)
+                self.p.timeframe,
+                self.p.compression,
+                dtobj,
+                -1) - timedelta(microseconds=100)
         dt = date2num(dtobj)
         if dt <= self.lines.datetime[-1]:
             return False  # time already seen
