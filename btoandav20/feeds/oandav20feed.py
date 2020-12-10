@@ -88,6 +88,12 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         Return candles instead of streaming for current data, granularity
         needs to be higher than Ticks
 
+      - ``candles_delay`` (default: ``1``)
+
+        The delay in seconds when new candles should be fetched after a
+        period is over
+
+
       - ``adjstarttime`` (default: ``False``)
 
         Allows to adjust the start time of a candle to the end of the
@@ -132,6 +138,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         bidask=True,
         useask=False,
         candles=False,
+        candles_delay=1,
         adjstarttime=False,   # adjust start time of candle
         # TODO readd tmout - set timeout in store
         reconnect=True,
@@ -275,9 +282,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     dt=dtnow,
                     offset=-1)
                 dtdiff = dtnext - dtnow
-                tmout = (dtdiff.days * 24 * 60 * 60) + dtdiff.seconds + 1
+                tmout = (dtdiff.days * 24 * 60 * 60) + dtdiff.seconds + self.p.candles_delay
                 if tmout <= 0:
-                    tmout = 5
+                    tmout = self.p.candles_delay
                 _time.sleep(tmout)
 
     def _getstarttime(self, timeframe, compression, dt=None, offset=0):
