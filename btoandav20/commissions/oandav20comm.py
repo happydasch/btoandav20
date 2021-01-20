@@ -13,7 +13,8 @@ class OandaV20BacktestCommInfo(CommInfoBase):
         commtype=CommInfoBase.COMM_FIXED,
     )
 
-    def __init__(self):
+    def __init__(self, data=None):
+        self.data = data
         if self.p.stocklike:
             raise Exception('Stocklike is not supported')
         super(OandaV20BacktestCommInfo, self).__init__()
@@ -32,11 +33,19 @@ class OandaV20BacktestCommInfo(CommInfoBase):
         If account currency is same as the base currency, change pip value calc.
         https://community.backtrader.com/topic/525/forex-commission-scheme
         '''
+        if (self.data is not None
+                and hasattr(self.data.l, 'bid_close')
+                and hasattr(self.data.l, 'ask_close')
+                and hasattr(self.data.l, 'mid_close')):
+            if size > 0:
+                spread = self.data.l.mid_close[0] - self.data.l.bid_close[0]
+            else:
+                spread = self.data.l.ask_close[0] - self.data.l.mid_close[0]
+        else:
+            spread = self.p.spread
         multiplier = float(10 ** self.p.pip_location)
         if self.p.acc_counter_currency:
-            comm = abs(
-                self.p.spread * (size * multiplier))
+            comm = abs(spread * (size * multiplier))
         else:
-            comm = abs(
-                self.p.spread * ((size / price) * multiplier))
+            comm = abs(spread * ((size / price) * multiplier))
         return comm / 2

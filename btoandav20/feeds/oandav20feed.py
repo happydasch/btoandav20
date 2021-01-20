@@ -24,6 +24,7 @@ class MetaOandaV20Data(DataBase.__class__):
 
 
 class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
+
     '''Oanda v20 Data Feed.
 
     Params:
@@ -129,6 +130,9 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
     Any other combination will be rejected
     '''
+
+    lines = ('mid_close', 'bid_close', 'ask_close',)
+
     params = dict(
         qcheck=0.5,
         historical=False,     # do backfilling at the start
@@ -157,10 +161,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
 
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
-        if self.p.bidask:
-            self._candleFormat = 'A' if self.p.useask else 'B'
-        else:
-            self._candleFormat = 'M'
+        self._candleFormat = 'ABM'
 
     def setenvironment(self, env):
         '''Receives an environment (cerebro) and passes it over to the store it
@@ -173,7 +174,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         contractdetails if it exists'''
         super(OandaV20Data, self).start()
 
-        # Create attributes as soon as possible
+        # create attributes as soon as possible
         self._statelivereconn = False  # if reconnecting in live state
         self._storedmsg = dict()  # keep pending live message (under None)
         self.qlive = queue.Queue()
@@ -181,7 +182,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
         self._reconns = self.p.reconnections
         self.contractdetails = None
 
-        # Kickstart store and get queue to wait on
+        # kickstart store and get queue to wait on
         self.o.start(data=self)
 
         # check if the granularity is supported
@@ -282,7 +283,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     dt=dtnow,
                     offset=-1)
                 dtdiff = dtnext - dtnow
-                tmout = (dtdiff.days * 24 * 60 * 60) + dtdiff.seconds + self.p.candles_delay
+                tmout = (dtdiff.days * 24 * 60 * 60) + \
+                    dtdiff.seconds + self.p.candles_delay
                 if tmout <= 0:
                     tmout = self.p.candles_delay
                 _time.sleep(tmout)
@@ -441,7 +443,8 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 dtend = None
                 if len(self) > 1:
                     # len == 1 ... forwarded for the 1st time
-                    dtbegin = self.datetime.datetime(-1).astimezone(timezone.utc)
+                    dtbegin = self.datetime.datetime(
+                        -1).astimezone(timezone.utc)
                 elif self.fromdate > float('-inf'):
                     dtbegin = num2date(self.fromdate, tz=timezone.utc)
                 else:  # 1st bar and no begin set
@@ -500,7 +503,7 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                     continue
 
                 # copy lines of the same name
-                for alias in self.lines.getlinealiases():
+                for alias in self.l.getlinealiases():
                     lsrc = getattr(self.p.backfill_from.lines, alias)
                     ldst = getattr(self.lines, alias)
 
@@ -516,31 +519,35 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
     def _load_tick(self, msg):
         dtobj = datetime.utcfromtimestamp(float(msg['time']))
         dt = date2num(dtobj)
-        if dt <= self.lines.datetime[-1]:
+        if dt <= self.l.datetime[-1]:
             return False  # time already seen
 
-        # Common fields
-        self.lines.datetime[0] = dt
-        self.lines.volume[0] = 0.0
-        self.lines.openinterest[0] = 0.0
+        # common fields
+        self.l.datetime[0] = dt
+        self.l.volume[0] = 0.0
+        self.l.openinterest[0] = 0.0
 
-        # Put the prices into the bar
+        # put the prices into the bar
+        price = {}
+        price['ask'] = float(msg['asks'][0]['price'])
+        price['bid'] = float(msg['bids'][0]['price'])
+        price['mid'] = round(
+            (price['bid'] + price['ask']) / 2,
+            self.contractdetails['displayPrecision'])
         if self.p.bidask:
             if self.p.useask:
-                tick = float(msg['asks'][0]['price'])
+                price[None] = 'ask'
             else:
-                tick = float(msg['bids'][0]['price'])
+                price[None] = 'bid'
         else:
-            # create mid price
-            tick = (
-                float(msg['bids'][0]['price'])
-                + float(msg['asks'][0]['price'])) / 2
-        self.lines.open[0] = tick
-        self.lines.high[0] = tick
-        self.lines.low[0] = tick
-        self.lines.close[0] = tick
-        self.lines.volume[0] = 0.0
-        self.lines.openinterest[0] = 0.0
+            price[None] = 'mid'
+        for t in ['open', 'high', 'low', 'close']:
+            getattr(self.l, t)[0] = price[price[None]]
+        for x in ['mid', 'bid', 'ask']:
+            getattr(self.l, f'{x}_close')[0] = price[x]
+
+        self.l.volume[0] = 0.0
+        self.l.openinterest[0] = 0.0
 
         return True
 
@@ -556,31 +563,36 @@ class OandaV20Data(with_metaclass(MetaOandaV20Data, DataBase)):
                 dtobj,
                 -1) - timedelta(microseconds=100)
         dt = date2num(dtobj)
-        if dt <= self.lines.datetime[-1]:
+        if dt <= self.l.datetime[-1]:
             return False  # time already seen
 
-        # Common fields
-        self.lines.datetime[0] = dt
-        self.lines.volume[0] = float(msg['volume'])
-        self.lines.openinterest[0] = 0.0
+        # common fields
+        self.l.datetime[0] = dt
+        self.l.volume[0] = float(msg['volume'])
+        self.l.openinterest[0] = 0.0
 
-        # Put the prices into the bar
+        # put the prices into the bar
+        price = {'bid': {}, 'ask': {}, 'mid': {}}
+        for price_side in price:
+            price[price_side]['open'] = msg[price_side]['o']
+            price[price_side]['high'] = msg[price_side]['h']
+            price[price_side]['low'] = msg[price_side]['l']
+            price[price_side]['close'] = msg[price_side]['c']
+
+        # select default price side for ohlc values
         if self.p.bidask:
             if not self.p.useask:
-                o_price, h_price, l_price, c_price = (
-                    msg['bid']['o'], msg['bid']['h'],
-                    msg['bid']['l'], msg['bid']['c'])
+                price[None] = price['bid']
             else:
-                o_price, h_price, l_price, c_price = (
-                    msg['ask']['o'], msg['ask']['h'],
-                    msg['ask']['l'], msg['ask']['c'])
+                price[None] = price['ask']
         else:
-            o_price, h_price, l_price, c_price = (
-                msg['mid']['o'], msg['mid']['h'],
-                msg['mid']['l'], msg['mid']['c'])
-        self.lines.open[0] = float(o_price)
-        self.lines.high[0] = float(h_price)
-        self.lines.low[0] = float(l_price)
-        self.lines.close[0] = float(c_price)
+            price[None] = price['mid']
+        # set ohlc values
+        for x in price[None]:
+            getattr(self.l, x)[0] = price[None][x]
+        # set all close values
+        for x in ['mid', 'bid', 'ask']:
+            ident = f'{x}_close'
+            getattr(self.l, ident)[0] = price[x]['close']
 
         return True
