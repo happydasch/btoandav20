@@ -12,14 +12,15 @@ class St(bt.Strategy):
 
     def notify_store(self, msg, *args, **kwargs):
         if "clientExtensions" in msg:
-            o_info = json.loads(msg["clientExtensions"]["comment"]
+            o_info = json.loads(msg["clientExtensions"]["comment"])
 
     def next(self):
         if self.order:
             return
-        self.buy(exectype=bt.Order.Limit, price=price, size=1)
+        self.order = self.buy(
+            size=1)
 
-with open("config/config.json", "r") as file:
+with open("config.json", "r") as file:
     config = json.load(file)
 
 storekwargs = dict(
