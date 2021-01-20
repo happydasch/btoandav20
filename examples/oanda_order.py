@@ -128,7 +128,7 @@ class St(bt.Strategy):
                     self.order = self.buy(exectype=bt.Order.Stop, price=price, size=1)
 
 
-with open("config/config.json", "r") as file:
+with open("config.json", "r") as file:
     config = json.load(file)
 
 storekwargs = dict(

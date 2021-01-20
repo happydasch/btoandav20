@@ -117,7 +117,7 @@ If you encounter an issue during installation, please check this url first: <htt
 
 ## Getting Started
 
-See the [example](examples/oandav20test) folder for more detailed explanation on how to use it.
+See the [example](examples) folder for more detailed explanation on how to use it.
 
 ## Contribute
 
