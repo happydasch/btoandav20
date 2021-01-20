@@ -514,7 +514,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         trailamount,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
-                        id=self._oref_to_client_id(stopside.ref)
+                        id=self._oref_to_client_id(stopside.ref),
+                        comment=json.dumps(order.info)
                     ).dict()
                 ).dict()
             else:
@@ -523,7 +524,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                         stopside.price,
                         '.%df' % order.data.contractdetails['displayPrecision']),
                     clientExtensions=v20.transaction.ClientExtensions(
-                        id=self._oref_to_client_id(stopside.ref)
+                        id=self._oref_to_client_id(stopside.ref),
+                        comment=json.dumps(order.info)
                     ).dict()
                 ).dict()
 
@@ -533,13 +535,15 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     takeside.price,
                     '.%df' % order.data.contractdetails['displayPrecision']),
                 clientExtensions=v20.transaction.ClientExtensions(
-                    id=self._oref_to_client_id(takeside.ref)
+                    id=self._oref_to_client_id(takeside.ref),
+                    comment=json.dumps(order.info)
                 ).dict()
             ).dict()
 
         # store backtrader order ref in client extensions
         okwargs['clientExtensions'] = v20.transaction.ClientExtensions(
-            id=self._oref_to_client_id(order.ref)
+            id=self._oref_to_client_id(order.ref),
+            comment=json.dumps(order.info)
         ).dict()
 
         okwargs.update(**kwargs)  # anything from the user
