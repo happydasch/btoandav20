@@ -9,16 +9,30 @@ class St(bt.Strategy):
 
     def __init__(self):
         self.order = None
+        self.mybuysignals = {
+            "buysignal1": False,
+            "buysignal2": False,
+            "buysignal3": False,
+            "buysignal4": True,
+            "buysignal5": False,
+
+        }
 
     def notify_store(self, msg, *args, **kwargs):
         if "clientExtensions" in msg:
             o_info = json.loads(msg["clientExtensions"]["comment"])
+            buytrigger = o_info["buytrigger"]
 
     def next(self):
         if self.order:
             return
-        self.order = self.buy(
-            size=1)
+
+        for k, v in self.mybuysignals.items():
+            if v:
+                self.order = self.buy(
+                    size=1,
+                    buytrigger=k
+                    )
 
 with open("config.json", "r") as file:
     config = json.load(file)
