@@ -89,6 +89,8 @@ The following steps have been tested on Mac OS High Sierra and Ubuntu 16 and 18.
 
 1. Install backtrader ``pip install backtrader[plotting]`` (<https://www.backtrader.com/docu/installation.html>)
 2. Install btoandav20 ``pip install git+https://github.com/happydasch/btoandav20``
+   or with ``pipenv install git+https://github.com/happydasch/btoandav20#egg=btoandav20``
+
 3. Import ``btoandav20`` into your script: ``import btoandav20`` (this is considering your script is at the root of your folder)
 
 **You can then access the different parts such as:**
