@@ -61,6 +61,7 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         self.startingcash = self.cash = 0.0
         self.startingvalue = self.value = 0.0
         self.positions = collections.defaultdict(Position)
+        self.brokerpositions = collections.defaultdict(Position)
 
     def start(self):
         super(OandaV20Broker, self).start()
@@ -128,6 +129,23 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
     def getposition(self, data, clone=True):
         # return self.o.getposition(data._dataname, clone=clone)
         pos = self.positions[data._dataname]
+        if clone:
+            pos = pos.clone()
+
+        return pos
+    
+    def getbrokerposition(self, data, clone=True):
+        #reset
+        self.brokerpositions = collections.defaultdict(Position)
+        #get open positions from broker
+        positions = self.o.get_positions()
+        for p in positions:
+            size = float(p['long']['units']) + float(p['short']['units'])
+            price = (
+                float(p['long']['averagePrice']) if size > 0
+                else float(p['short']['averagePrice']))
+            self.brokerpositions[p['instrument']] = Position(size, price)
+        pos = self.brokerpositions[data._dataname]
         if clone:
             pos = pos.clone()
 
