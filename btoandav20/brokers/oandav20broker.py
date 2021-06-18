@@ -133,18 +133,31 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
             pos = pos.clone()
 
         return pos
+
+    def synpositions(self,reverse=False):
+
+        if reverse:
+            self.brokerpositions = self.positions
+        else:
+            self.positions = self.brokerpositions
     
-    def getbrokerposition(self, data, clone=True):
-        #reset
-        self.brokerpositions = collections.defaultdict(Position)
-        #get open positions from broker
+    def updatebrokerpositions(self):
         positions = self.o.get_positions()
-        for p in positions:
-            size = float(p['long']['units']) + float(p['short']['units'])
-            price = (
-                float(p['long']['averagePrice']) if size > 0
-                else float(p['short']['averagePrice']))
-            self.brokerpositions[p['instrument']] = Position(size, price)
+        if positions is None:
+            self.brokerpositions = collections.defaultdict(Position)
+        else:
+            for p in positions:
+                size = float(p['long']['units']) + float(p['short']['units'])
+                price = (
+                    float(p['long']['averagePrice']) if size > 0
+                    else float(p['short']['averagePrice']))
+                self.brokerpositions[p['instrument']] = Position(size, price)
+    
+    def getbrokerposition(self, data, clone=True, updatepositions=True):
+        
+        if updatepositions:
+            self.updatebrokerpositions()
+        
         pos = self.brokerpositions[data._dataname]
         if clone:
             pos = pos.clone()
