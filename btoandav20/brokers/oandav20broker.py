@@ -61,7 +61,6 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         self.startingcash = self.cash = 0.0
         self.startingvalue = self.value = 0.0
         self.positions = collections.defaultdict(Position)
-        self.brokerpositions = collections.defaultdict(Position)
 
     def start(self):
         super(OandaV20Broker, self).start()
@@ -134,35 +133,9 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
 
         return pos
 
-    def synpositions(self,reverse=False):
-
-        if reverse:
-            self.brokerpositions = self.positions
-        else:
-            self.positions = self.brokerpositions
-    
-    def updatebrokerpositions(self):
-        positions = self.o.get_positions()
-        if positions is None:
-            self.brokerpositions = collections.defaultdict(Position)
-        else:
-            for p in positions:
-                size = float(p['long']['units']) + float(p['short']['units'])
-                price = (
-                    float(p['long']['averagePrice']) if size > 0
-                    else float(p['short']['averagePrice']))
-                self.brokerpositions[p['instrument']] = Position(size, price)
-    
-    def getbrokerposition(self, data, clone=True, updatepositions=True):
-        
-        if updatepositions:
-            self.updatebrokerpositions()
-        
-        pos = self.brokerpositions[data._dataname]
-        if clone:
-            pos = pos.clone()
-
-        return pos
+    def getserverposition(self,data):
+        pos = self.o.get_server_position()
+        return pos[data._dataname]
 
     def orderstatus(self, order):
         o = self.orders[order.ref]
