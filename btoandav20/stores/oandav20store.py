@@ -632,6 +632,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self._currency = accinfo.currency
                 self._leverage = 1/accinfo.marginRate
 
+                #reset
+                self._server_positions = collections.defaultdict(OandaPosition)
                 #Position
                 # convert positions to dict
                 _utc_now = datetime.utcnow()
