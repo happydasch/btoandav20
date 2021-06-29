@@ -13,8 +13,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
-from backtrader.position import Position
-
+from . import OandaPosition
 
 class SerializableEvent(object):
     '''A threading.Event that can be serialized.'''
@@ -209,7 +208,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._evt_acct = SerializableEvent()
         self._orders = collections.OrderedDict()  # map order.ref to order id
         self._trades = collections.OrderedDict()  # map order.ref to trade id
-        self._server_positions = collections.defaultdict(Position)
+        self._server_positions = collections.defaultdict(OandaPosition)
         # init oanda v20 api context
         self.oapi = v20.Context(
             self._OAPI_URL[int(self.p.practice)],
@@ -273,6 +272,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert positions to dict
             for idx, val in enumerate(pos):
                 pos[idx] = val.dict()
+            _utc_now = datetime.utcnow()
+            for p in pos:
+                size = float(p['long']['units']) + float(p['short']['units'])
+                price = (
+                    float(p['long']['averagePrice']) if size > 0
+                    else float(p['short']['averagePrice']))
+                self._server_positions[p['instrument']] = OandaPosition(size, price, dt=_utc_now)
         except (v20.V20ConnectionError, v20.V20Timeout) as e:
             self.put_notification(str(e))
         except Exception as e:
@@ -636,7 +642,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                     price = (
                         float(p['long']['averagePrice']) if size > 0
                         else float(p['short']['averagePrice']))
-                    self._server_positions[p['instrument']] = Position(size, price, dt=_utc_now)
+                    self._server_positions[p['instrument']] = OandaPosition(size, price,dt=_utc_now)
             except KeyError:
                 pass
 
