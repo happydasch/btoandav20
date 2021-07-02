@@ -118,10 +118,10 @@ class OandaPosition(object):
     __nonzero__ = __bool__
 
     def clone(self):
-        return Position(size=self.size, price=self.price)
+        return OandaPosition(size=self.size, price=self.price)
 
     def pseudoupdate(self, size, price):
-        return Position(self.size, self.price).update(size, price)
+        return OandaPosition(self.size, self.price).update(size, price)
 
     def update(self, size, price, dt=None):
         '''
