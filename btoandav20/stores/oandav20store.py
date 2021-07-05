@@ -293,8 +293,8 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
     
     def get_server_position(self, update_latest = False):
         if update_latest:
-            self.get_positions()
-            
+            return self.get_positions()
+        #scheduled position
         return self._server_positions
 
     def get_granularity(self, timeframe, compression):
