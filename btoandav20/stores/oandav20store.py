@@ -844,6 +844,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._process_trades(self._orders[oid], trans)
         else:
             # external order created this transaction
+            self.get_server_position(update_latest=True)
             if self.broker.p.use_positions and ttype in self._X_FILL_TRANS:
                 size = float(trans['units'])
                 price = float(trans['price'])
