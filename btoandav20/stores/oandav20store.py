@@ -291,7 +291,10 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         except NameError:
             return None
     
-    def get_server_position(self):
+    def get_server_position(self, update_latest = False):
+        if update_latest:
+            self.get_positions()
+            
         return self._server_positions
 
     def get_granularity(self, timeframe, compression):
