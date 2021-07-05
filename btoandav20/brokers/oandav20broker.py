@@ -134,8 +134,10 @@ class OandaV20Broker(with_metaclass(MetaOandaV20Broker, BrokerBase)):
         return pos
 
     def getserverposition(self,data):
-        pos = self.o.get_server_position()
-        return pos[data._dataname]
+        poss = self.o.get_server_position()
+        pos = poss[data._dataname]
+        pos = pos.clone()
+        return pos
 
     def orderstatus(self, order):
         o = self.orders[order.ref]
