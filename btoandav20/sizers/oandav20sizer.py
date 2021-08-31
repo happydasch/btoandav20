@@ -22,20 +22,34 @@ class OandaV20Sizer(bt.Sizer):
         if position:
             return position.size
 
-        avail = 0
         name = data.contractdetails['name']
-        price = self.o.get_pricing(name)
-        if price is not None:
-            if isbuy:
-                avail = float(price['unitsAvailable']['default']['long'])
-            else:
-                avail = float(price['unitsAvailable']['default']['short'])
+        sym_src = self.o.get_currency()
+        sym_to = name[-(len(sym_src)):]
+
+        cash_to_use = 0
+        if self.p.percents != 0:
+            cash_to_use = cash * (self.p.percents / 100)
+        elif self.p.amount != 0:
+            cash_to_use = self.p.amount
+        cash_to_use = cash_to_use * self.o.get_leverage()
         if self.p.avail_reduce_perc > 0:
-            avail -= avail / 100 * self.p.avail_reduce_perc
+            cash_to_use -= cash_to_use / 100 * self.p.avail_reduce_perc
+
+        price = self.o.get_pricing(name)
+        if not price:
+            return 0
+        if sym_src != sym_to:
+            # convert cash to target currency
+            convprice = self.o.get_pricing(sym_src + '_' + sym_to)
+            if convprice:
+                cash_to_use = (
+                    cash_to_use
+                    / (1 / float(convprice['closeoutAsk'])))
+
         if self.p.percents != 0:
             size = avail * (self.p.percents / 100)
         elif self.p.amount != 0:
-            size = (avail / cash) * self.p.amount
+            size = cash_to_use * (self.p.amount / cash)
         else:
             size = 0
         return int(size)
@@ -85,9 +99,8 @@ class OandaV20RiskSizer(bt.Sizer):
             return position.size
 
         name = data.contractdetails['name']
-
-        sym_to = name[4:]
         sym_src = self.o.get_currency()
+        sym_to = name[-(len(sym_src)):]
 
         cash_to_use = 0
         if self.p.percents != 0:
@@ -95,6 +108,8 @@ class OandaV20RiskSizer(bt.Sizer):
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
         cash_to_use = cash_to_use * self.o.get_leverage()
+        if self.p.avail_reduce_perc > 0:
+            cash_to_use -= cash_to_use / 100 * self.p.avail_reduce_perc
 
         price = self.o.get_pricing(name)
         if not price:
@@ -103,8 +118,9 @@ class OandaV20RiskSizer(bt.Sizer):
             # convert cash to target currency
             convprice = self.o.get_pricing(sym_src + '_' + sym_to)
             if convprice:
-                cash_to_use = (cash_to_use
-                               / (1 / float(convprice['closeoutAsk'])))
+                cash_to_use = (
+                    cash_to_use
+                    / (1 / float(convprice['closeoutAsk'])))
 
         price_per_pip = cash_to_use / pips
         mult = float(1 / 10 ** data.contractdetails['pipLocation'])
