@@ -94,6 +94,7 @@ class OandaV20RiskSizer(bt.Sizer):
             cash_to_use = cash * (self.p.percents / 100)
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
+        cash_to_use = cash_to_use * self.o.get_leverage()
 
         price = self.o.get_pricing(name)
         if not price:
@@ -108,18 +109,6 @@ class OandaV20RiskSizer(bt.Sizer):
         price_per_pip = cash_to_use / pips
         mult = float(1 / 10 ** data.contractdetails['pipLocation'])
         size = price_per_pip * mult
-
-        if isbuy:
-            avail = float(price['unitsAvailable']['default']['long'])
-        else:
-            avail = float(price['unitsAvailable']['default']['short'])
-        if self.p.avail_reduce_perc > 0:
-            avail -= avail / 100 * self.p.avail_reduce_perc
-        if isbuy:
-            size = min(size, avail)
-        else:
-            size = min(size, avail)
-
         return int(size)
 
 
