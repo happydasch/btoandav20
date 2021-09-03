@@ -31,7 +31,6 @@ class OandaV20Sizer(bt.Sizer):
             cash_to_use = cash * (self.p.percents / 100)
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
-        cash_to_use = cash_to_use * self.o.get_leverage()
         if self.p.avail_reduce_perc > 0:
             cash_to_use -= cash_to_use / 100 * self.p.avail_reduce_perc
 
@@ -107,7 +106,6 @@ class OandaV20RiskSizer(bt.Sizer):
             cash_to_use = cash * (self.p.percents / 100)
         elif self.p.amount != 0:
             cash_to_use = self.p.amount
-        cash_to_use = cash_to_use * self.o.get_leverage()
         if self.p.avail_reduce_perc > 0:
             cash_to_use -= cash_to_use / 100 * self.p.avail_reduce_perc
 
