@@ -1,3 +1,0 @@
-backtrader>=1.9.61.122
-pyyaml
-v20
