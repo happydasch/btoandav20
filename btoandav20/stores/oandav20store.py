@@ -13,7 +13,7 @@ import v20
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
-
+from .oandaposition import OandaPosition
 
 class SerializableEvent(object):
     '''A threading.Event that can be serialized.'''
@@ -208,7 +208,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
         self._evt_acct = SerializableEvent()
         self._orders = collections.OrderedDict()  # map order.ref to order id
         self._trades = collections.OrderedDict()  # map order.ref to trade id
-
+        self._server_positions = collections.defaultdict(OandaPosition)
         # init oanda v20 api context
         self.oapi = v20.Context(
             self._OAPI_URL[int(self.p.practice)],
@@ -272,6 +272,13 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             # convert positions to dict
             for idx, val in enumerate(pos):
                 pos[idx] = val.dict()
+            _utc_now = datetime.utcnow()
+            for p in pos:
+                size = float(p['long']['units']) + float(p['short']['units'])
+                price = (
+                    float(p['long']['averagePrice']) if size > 0
+                    else float(p['short']['averagePrice']))
+                self._server_positions[p['instrument']] = OandaPosition(size, price, dt=_utc_now)
         except (v20.V20ConnectionError, v20.V20Timeout) as e:
             self.put_notification(str(e))
         except Exception as e:
@@ -283,6 +290,12 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             return pos
         except NameError:
             return None
+    
+    def get_server_position(self, update_latest = False):
+        if update_latest:
+           self.get_positions()
+
+        return self._server_positions
 
     def get_granularity(self, timeframe, compression):
         '''Returns the granularity useable for oanda'''
@@ -601,6 +614,9 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             try:
                 response = self.oapi.account.summary(self.p.account)
                 accinfo = response.get('account', 200)
+
+                response = self.oapi.position.list_open(self.p.account)
+                pos = response.get('positions', 200)
             except (v20.V20ConnectionError, v20.V20Timeout) as e:
                 self.put_notification(str(e))
                 if self.p.reconnections == 0:
@@ -618,6 +634,20 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
                 self._value = accinfo.balance
                 self._currency = accinfo.currency
                 self._leverage = 1/accinfo.marginRate
+
+                #reset
+                self._server_positions = collections.defaultdict(OandaPosition)
+                #Position
+                # convert positions to dict
+                _utc_now = datetime.utcnow()
+                for idx, val in enumerate(pos):
+                    pos[idx] = val.dict()
+                for p in pos:
+                    size = float(p['long']['units']) + float(p['short']['units'])
+                    price = (
+                        float(p['long']['averagePrice']) if size > 0
+                        else float(p['short']['averagePrice']))
+                    self._server_positions[p['instrument']] = OandaPosition(size, price,dt=_utc_now)
             except KeyError:
                 pass
 
@@ -814,6 +844,7 @@ class OandaV20Store(with_metaclass(MetaSingleton, object)):
             self._process_trades(self._orders[oid], trans)
         else:
             # external order created this transaction
+            self.get_server_position(update_latest=True)
             if self.broker.p.use_positions and ttype in self._X_FILL_TRANS:
                 size = float(trans['units'])
                 price = float(trans['price'])
